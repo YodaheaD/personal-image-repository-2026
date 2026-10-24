@@ -111,7 +111,9 @@ jobs:
       #   APPINSIGHTS_ENABLED=false
       #   WEBSITE_USE_DIAGNOSTIC_SERVER=false
       # Resource group (portal): imageRepoResources — app name: image-repo-app
-      # Startup Command: node azure-start.js
+      # Startup Command MUST be set in Azure Portal (publish-profile cannot set
+      # startup-command on webapps-deploy): Configuration → General settings →
+      # Startup Command = node azure-start.js
       # SCM_DO_BUILD_DURING_DEPLOYMENT: false (standalone zip is self-contained)
 
       - name: Deploy to Azure Web App - attempt 1
@@ -124,7 +126,6 @@ jobs:
           package: "release.zip"
           clean: true
           restart: true
-          startup-command: "node azure-start.js"
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_E7D40AEE6FE14BEEAB9183815729A66D }}
 
       - name: Wait before retry if deployment failed
@@ -140,5 +141,4 @@ jobs:
           package: "release.zip"
           clean: true
           restart: true
-          startup-command: "node azure-start.js"
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_E7D40AEE6FE14BEEAB9183815729A66D }}
