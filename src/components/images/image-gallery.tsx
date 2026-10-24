@@ -9,14 +9,10 @@ import {
 } from "@/components/ui/popover";
 import type { ImageRecord } from "@/lib/api/types";
 import { formatEpochMs } from "@/lib/dates";
-import { displayUrlOf } from "@/lib/image-urls";
+import { displayImageLabel, displayUrlOf } from "@/lib/image-urls";
 
 interface Props {
   images: ImageRecord[];
-}
-
-function imageTitle(img: ImageRecord): string {
-  return String(img.name || img.RowKey || img.PartitionKey || "Image");
 }
 
 /**
@@ -63,7 +59,7 @@ export function ImageGallery({ images }: Props) {
       {images.map((img, index) => {
         const id = String(img.RowKey ?? img.name ?? index);
         const src = displayUrlOf(img);
-        const title = imageTitle(img);
+        const title = displayImageLabel(img);
         const open = openId === id;
 
         if (!src) return null;

@@ -3,7 +3,7 @@
 import { DateRangeSearch, type DateRangeResult } from "@/components/images/date-range-search";
 import { Accordion, AccordionItem, useOpenSet } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import type { FilterBundle, FilterLevel, FilterRow } from "@/lib/api/types";
+import type { FilterLevel } from "@/lib/api/types";
 import {
   FILTER_ACCORDION_ORDER,
   FILTER_LEVEL_LABELS,
@@ -12,12 +12,12 @@ import {
   hasLocationSelection,
   optionsForLevel,
   toggleFilterValue,
+  type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
 
 interface Props {
-  filters: FilterRow[];
-  bundles?: FilterBundle[] | Record<string, string[]>;
+  catalog: FilterCatalog;
   selected: SelectedFilters;
   onSelectedChange: (next: SelectedFilters) => void;
   onDateSearch: (range: DateRangeResult) => void;
@@ -27,8 +27,7 @@ interface Props {
 }
 
 export function FilterSidebar({
-  filters,
-  bundles,
+  catalog,
   selected,
   onSelectedChange,
   onDateSearch,
@@ -39,8 +38,7 @@ export function FilterSidebar({
   const { isOpen, toggle } = useOpenSet(["country", "dateTaken"]);
 
   function onToggleValue(level: FilterLevel, value: string) {
-    const next = toggleFilterValue(selected, level, value, filters, bundles);
-    onSelectedChange(next);
+    onSelectedChange(toggleFilterValue(selected, level, value, catalog));
   }
 
   return (
@@ -62,7 +60,7 @@ export function FilterSidebar({
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Accordion>
           {FILTER_ACCORDION_ORDER.map((level) => {
-            const options = optionsForLevel(filters, bundles, level, selected);
+            const options = optionsForLevel(catalog, level, selected);
             const checked = selected[level] ?? [];
             return (
               <AccordionItem

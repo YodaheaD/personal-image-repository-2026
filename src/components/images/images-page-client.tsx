@@ -12,14 +12,11 @@ import {
   fetchPaginated,
   imagesFromPaginated,
 } from "@/lib/api/client";
-import type {
-  FilterBundle,
-  FilterRow,
-  ImageRecord,
-  PaginatedParams,
-} from "@/lib/api/types";
+import type { ImageRecord, PaginatedParams } from "@/lib/api/types";
 import {
   hasLocationSelection,
+  parseFilterCatalog,
+  type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
 import { filterDisplayableImages } from "@/lib/image-urls";
@@ -30,10 +27,7 @@ export function ImagesPageClient() {
   const router = useRouter();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [filters, setFilters] = useState<FilterRow[]>([]);
-  const [bundles, setBundles] = useState<
-    FilterBundle[] | Record<string, string[]> | undefined
-  >();
+  const [catalog, setCatalog] = useState<FilterCatalog>({});
   const [selected, setSelected] = useState<SelectedFilters>({});
   const [searchQuery, setSearchQuery] = useState(
     () => searchParams.get("searchQuery") ?? "",
@@ -59,8 +53,8 @@ export function ImagesPageClient() {
     fetchFilters()
       .then((res) => {
         if (cancelled) return;
-        setFilters(res.filters ?? res.returnedFilters ?? []);
-        setBundles(res.filterbundles);
+        // getFilters returns flat { country: string[], ... } — not { filters }
+        setCatalog(parseFilterCatalog(res));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -190,8 +184,7 @@ export function ImagesPageClient() {
       >
         {sidebarOpen && (
           <FilterSidebar
-            filters={filters}
-            bundles={bundles}
+            catalog={catalog}
             selected={selected}
             onSelectedChange={onLocationChange}
             onDateSearch={onDateSearch}

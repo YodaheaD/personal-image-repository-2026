@@ -47,12 +47,18 @@ export interface FilterBundle {
   [key: string]: unknown;
 }
 
-export interface FiltersResponse {
-  filters?: FilterRow[];
+/**
+ * getFilters body is a flat level → string[] map (Functions contract).
+ * Legacy `{ filters, filterbundles }` may still appear elsewhere.
+ */
+export type FiltersResponse = Partial<
+  Record<FilterLevel, string[]>
+> & {
+  filters?: FilterRow[] | Record<string, string[]>;
   filterbundles?: FilterBundle[] | Record<string, string[]>;
-  returnedFilters?: FilterRow[];
+  returnedFilters?: FilterRow[] | Record<string, string[]>;
   [key: string]: unknown;
-}
+};
 
 export interface ImageRecord {
   PartitionKey?: string;
