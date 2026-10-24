@@ -42,8 +42,8 @@ export function FilterSidebar({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
         <p className="text-sm font-semibold">Filters</p>
         <Button type="button" variant="ghost" size="sm" onClick={onReset}>
           Reset

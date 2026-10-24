@@ -59,7 +59,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="border-b border-[var(--border)] bg-[var(--background)]">
+    <header className="shrink-0 border-b border-[var(--border)] bg-[var(--background)]">
       <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
         <Link
           href="/"
