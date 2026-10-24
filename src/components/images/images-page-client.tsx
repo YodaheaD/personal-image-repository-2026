@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import { FilterSidebar } from "@/components/images/filter-sidebar";
 import type { DateRangeResult } from "@/components/images/date-range-search";
 import { ImageGallery } from "@/components/images/image-gallery";
@@ -20,7 +26,10 @@ import {
   type SelectedFilters,
 } from "@/lib/filters";
 import { filterDisplayableImages } from "@/lib/image-urls";
+import { resolveTotalPages } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
+
+const PAGE_LIMIT = 50;
 
 export function ImagesPageClient() {
   const searchParams = useSearchParams();
@@ -53,7 +62,6 @@ export function ImagesPageClient() {
     fetchFilters()
       .then((res) => {
         if (cancelled) return;
-        // getFilters returns flat { country: string[], ... } — not { filters }
         setCatalog(parseFilterCatalog(res));
       })
       .catch((err: unknown) => {
@@ -79,7 +87,7 @@ export function ImagesPageClient() {
 
     const params: PaginatedParams = {
       page,
-      limit: 50,
+      limit: PAGE_LIMIT,
       sortOrder,
       searchQuery: searchQuery || undefined,
       ...(useLocation
@@ -107,15 +115,17 @@ export function ImagesPageClient() {
         filterDisplayableImages(raw);
       setImages(displayable);
       setHiddenCount(hiddenHeicOrMissing);
-      const tp =
-        res.totalPages ??
-        (res.total && res.limit
-          ? Math.max(1, Math.ceil(res.total / res.limit))
-          : 1);
-      setTotalPages(tp);
+      setTotalPages(
+        resolveTotalPages(res as Record<string, unknown>, {
+          requestedLimit: PAGE_LIMIT,
+          pageItemCount: raw.length,
+          currentPage: page,
+        }),
+      );
     } catch (err: unknown) {
       setImages([]);
       setHiddenCount(0);
+      setTotalPages(1);
       setError(err instanceof Error ? err.message : "Failed to load images");
     } finally {
       setLoading(false);
@@ -155,8 +165,7 @@ export function ImagesPageClient() {
     dateRange.startDate != null || dateRange.endDate != null;
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)]">
-      {/* Persistent toggle — always visible */}
+    <div className="flex h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
       <div className="flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--background)]">
         <Button
           type="button"
@@ -177,26 +186,28 @@ export function ImagesPageClient() {
 
       <aside
         className={cn(
-          "shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--background)]",
+          "min-h-0 shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--background)]",
           sidebarOpen ? "w-72 sm:w-80" : "w-0 border-r-0",
         )}
         aria-hidden={!sidebarOpen}
       >
         {sidebarOpen && (
-          <FilterSidebar
-            catalog={catalog}
-            selected={selected}
-            onSelectedChange={onLocationChange}
-            onDateSearch={onDateSearch}
-            onReset={resetAll}
-            disabled={loading}
-            hasDateRange={hasDateRange}
-          />
+          <div className="h-full overflow-y-auto">
+            <FilterSidebar
+              catalog={catalog}
+              selected={selected}
+              onSelectedChange={onLocationChange}
+              onDateSearch={onDateSearch}
+              onReset={resetAll}
+              disabled={loading}
+              hasDateRange={hasDateRange}
+            />
+          </div>
         )}
       </aside>
 
-      <section className="min-w-0 flex-1 space-y-4 px-3 py-4 sm:px-4">
-        <div className="flex flex-wrap items-end justify-between gap-2">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col px-3 py-4 sm:px-4">
+        <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-2">
           <div>
             <h1 className="text-xl font-semibold text-[var(--foreground)]">
               Images
@@ -210,64 +221,86 @@ export function ImagesPageClient() {
               </p>
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            Sort
-            <select
-              className="h-9 rounded-md border border-[var(--border)] bg-[var(--background)] px-2 text-sm"
-              value={sortOrder}
-              onChange={(e) => {
-                setSortOrder(e.target.value as "asc" | "desc");
-                setPage(1);
-              }}
-            >
-              <option value="desc">Newest first</option>
-              <option value="asc">Oldest first</option>
-            </select>
-          </label>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              Sort
+              <select
+                className="h-9 rounded-md border border-[var(--border)] bg-[var(--background)] px-2 text-sm"
+                value={sortOrder}
+                onChange={(e) => {
+                  setSortOrder(e.target.value as "asc" | "desc");
+                  setPage(1);
+                }}
+              >
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            </label>
+
+            <div className="flex items-center gap-1">
+              {page > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  disabled={loading}
+                  aria-label="First page"
+                  onClick={() => setPage(1)}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                disabled={page <= 1 || loading}
+                aria-label="Previous page"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[5.5rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
+                Page {page} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                disabled={page >= totalPages || loading}
+                aria-label="Next page"
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
 
         {error && (
-          <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+          <p className="mb-3 shrink-0 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
             {error}
           </p>
         )}
 
         {hiddenCount > 0 && (
-          <p className="text-xs text-[var(--muted-foreground)]">
+          <p className="mb-2 shrink-0 text-xs text-[var(--muted-foreground)]">
             Hid {hiddenCount} item
             {hiddenCount === 1 ? "" : "s"} with HEIC/original-only URLs (gallery
             uses compressedimages only).
           </p>
         )}
 
-        {loading ? (
-          <p className="text-sm text-[var(--muted-foreground)]">Loading…</p>
-        ) : (
-          <ImageGallery images={images} />
-        )}
-
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={page <= 1 || loading}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-[var(--muted-foreground)]">
-            Page {page} / {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages || loading}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading ? (
+            <p className="text-sm text-[var(--muted-foreground)]">Loading…</p>
+          ) : (
+            <ImageGallery images={images} />
+          )}
         </div>
       </section>
     </div>
