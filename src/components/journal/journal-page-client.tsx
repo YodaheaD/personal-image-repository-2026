@@ -1,101 +1,98 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  journalAddName,
   journalDeleteName,
   journalEditStory,
-  journalMakeFolder,
   journalReturnList,
   journalReturnText,
 } from "@/lib/api/client";
-import type { JournalEntry } from "@/lib/api/types";
+import {
+  countEntries,
+  parseJournalHierarchy,
+  type JournalHierarchy,
+} from "@/lib/journal-hierarchy";
+import { cn } from "@/lib/utils";
 
-function normalizeList(data: unknown): { folders: string[]; names: string[] } {
-  if (!data || typeof data !== "object") return { folders: [], names: [] };
-  const d = data as Record<string, unknown>;
-
-  const folders = Array.isArray(d.folders)
-    ? d.folders.map(String)
-    : Array.isArray(d.Folders)
-      ? (d.Folders as unknown[]).map(String)
-      : [];
-
-  let names: string[] = [];
-  if (Array.isArray(d.names)) names = d.names.map(String);
-  else if (Array.isArray(d.entries)) {
-    names = (d.entries as JournalEntry[])
-      .map((e) => e.name)
-      .filter(Boolean)
-      .map(String);
-  } else if (Array.isArray(d.data)) {
-    names = (d.data as JournalEntry[])
-      .map((e) => (typeof e === "string" ? e : e.name))
-      .filter(Boolean)
-      .map(String);
-  } else if (d.data && typeof d.data === "object" && !Array.isArray(d.data)) {
-    names = Object.keys(d.data as object);
-  }
-
-  return { folders, names: [...new Set(names)] };
+interface SelectedLeaf {
+  tripName: string;
+  tripNumber: number;
+  foldername: string;
+  name: string;
 }
 
 export function JournalPageClient() {
-  const [folders, setFolders] = useState<string[]>([]);
-  const [names, setNames] = useState<string[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [hierarchy, setHierarchy] = useState<JournalHierarchy>({ trips: [] });
+  const [openTrip, setOpenTrip] = useState<number | null>(null);
+  const [openFolders, setOpenFolders] = useState<Set<string>>(() => new Set());
+  const [selected, setSelected] = useState<SelectedLeaf | null>(null);
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
-  const [newName, setNewName] = useState("");
-  const [newFolder, setNewFolder] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [entryLoading, setEntryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   const refreshList = useCallback(async () => {
-    setLoading(true);
+    setListLoading(true);
     setError(null);
     try {
       const res = await journalReturnList();
-      const { folders: f, names: n } = normalizeList(res);
-      setFolders(f);
-      setNames(n);
+      const parsed = parseJournalHierarchy(res);
+      setHierarchy(parsed);
+      if (parsed.trips.length > 0 && openTrip == null) {
+        setOpenTrip(parsed.trips[0].tripNumber);
+      }
     } catch (err: unknown) {
+      setHierarchy({ trips: [] });
       setError(err instanceof Error ? err.message : "Failed to load journal");
     } finally {
-      setLoading(false);
+      setListLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only seed openTrip once
   }, []);
 
   useEffect(() => {
     void refreshList();
   }, [refreshList]);
 
-  const loadEntry = useCallback(async (name: string) => {
-    setSelected(name);
+  function toggleTrip(tripNumber: number) {
+    setOpenTrip((cur) => (cur === tripNumber ? null : tripNumber));
+  }
+
+  function toggleFolder(key: string) {
+    setOpenFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function selectEntry(leaf: SelectedLeaf) {
+    setSelected(leaf);
     setError(null);
     setStatus(null);
+    setEntryLoading(true);
     try {
-      const entry = await journalReturnText(name);
-      setText(String(entry.text ?? entry.story ?? ""));
-      setImages(
-        Array.isArray(entry.images) ? entry.images.map(String) : [],
-      );
+      const entry = await journalReturnText({
+        foldername: leaf.foldername,
+        name: leaf.name,
+      });
+      setText(entry.text);
+      setImages(entry.images);
+      if (entry.empty) setStatus("Empty entry.");
     } catch (err: unknown) {
       setText("");
       setImages([]);
       setError(err instanceof Error ? err.message : "Failed to load entry");
+    } finally {
+      setEntryLoading(false);
     }
-  }, []);
-
-  const sortedNames = useMemo(
-    () => [...names].sort((a, b) => a.localeCompare(b)),
-    [names],
-  );
+  }
 
   async function saveStory() {
     if (!selected) return;
@@ -103,7 +100,11 @@ export function JournalPageClient() {
     setError(null);
     setStatus(null);
     try {
-      await journalEditStory({ name: selected, text, story: text });
+      await journalEditStory({
+        foldername: selected.foldername,
+        name: selected.name,
+        data: text,
+      });
       setStatus("Saved.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -112,29 +113,15 @@ export function JournalPageClient() {
     }
   }
 
-  async function addEntry() {
-    const name = newName.trim();
-    if (!name) return;
-    setError(null);
-    try {
-      await journalAddName({
-        name,
-        folder: newFolder.trim() || undefined,
-      });
-      setNewName("");
-      await refreshList();
-      await loadEntry(name);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Add failed");
-    }
-  }
-
   async function removeEntry() {
     if (!selected) return;
-    if (!window.confirm(`Delete journal entry “${selected}”?`)) return;
+    if (!window.confirm(`Delete journal entry “${selected.name}”?`)) return;
     setError(null);
     try {
-      await journalDeleteName({ name: selected });
+      await journalDeleteName({
+        name: selected.name,
+        foldername: selected.foldername,
+      });
       setSelected(null);
       setText("");
       setImages([]);
@@ -144,132 +131,153 @@ export function JournalPageClient() {
     }
   }
 
-  async function createFolder() {
-    const folder = newFolder.trim();
-    if (!folder) return;
-    setError(null);
-    try {
-      await journalMakeFolder({ folder });
-      setStatus(`Folder “${folder}” created.`);
-      await refreshList();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Make folder failed");
-    }
-  }
+  const entryCount = countEntries(hierarchy);
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
-      <aside className="w-full shrink-0 space-y-4 lg:w-64">
-        <div>
-          <h1 className="text-xl font-semibold">Journal</h1>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            Simple notebook tied to the Functions journal table.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="new-entry">New entry</Label>
-          <Input
-            id="new-entry"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Entry name"
-          />
-          <Input
-            value={newFolder}
-            onChange={(e) => setNewFolder(e.target.value)}
-            placeholder="Folder (optional)"
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={() => void addEntry()}>
-              Add
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => void createFolder()}
-            >
-              Make folder
-            </Button>
-          </div>
-        </div>
-
-        {folders.length > 0 && (
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col md:flex-row">
+      {/* ~30% hierarchy sidebar */}
+      <aside className="flex w-full shrink-0 flex-col border-b border-[var(--border)] md:w-[30%] md:min-w-[16rem] md:max-w-sm md:border-b-0 md:border-r">
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-3">
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-              Folders
+            <h1 className="text-lg font-semibold">Journal</h1>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {listLoading
+                ? "Loading…"
+                : `${hierarchy.trips.length} trip${hierarchy.trips.length === 1 ? "" : "s"} · ${entryCount} entries`}
             </p>
-            <ul className="space-y-0.5 text-sm">
-              {folders.map((f) => (
-                <li key={f} className="truncate px-1 py-0.5">
-                  {f}
-                </li>
-              ))}
-            </ul>
           </div>
-        )}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => void refreshList()}
+            disabled={listLoading}
+          >
+            Refresh
+          </Button>
+        </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-              Entries
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {!listLoading && hierarchy.trips.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-[var(--muted-foreground)]">
+              No trips found.
             </p>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => void refreshList()}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-          </div>
-          {loading ? (
-            <p className="text-sm text-[var(--muted-foreground)]">Loading…</p>
-          ) : sortedNames.length === 0 ? (
-            <p className="text-sm text-[var(--muted-foreground)]">No entries.</p>
           ) : (
-            <ul className="max-h-[28rem] space-y-0.5 overflow-auto rounded-md border border-[var(--border)] p-1">
-              {sortedNames.map((name) => (
-                <li key={name}>
-                  <button
-                    type="button"
-                    onClick={() => void loadEntry(name)}
-                    className={`w-full rounded px-2 py-1.5 text-left text-sm ${
-                      selected === name
-                        ? "bg-[var(--muted)] font-medium"
-                        : "hover:bg-[var(--muted)]"
-                    }`}
+            <Accordion>
+              {hierarchy.trips.map((trip) => {
+                const tripOpen = openTrip === trip.tripNumber;
+                const tripEntryCount = trip.folders.reduce(
+                  (s, f) => s + f.entries.length,
+                  0,
+                );
+                return (
+                  <AccordionItem
+                    key={trip.tripNumber}
+                    id={`trip-${trip.tripNumber}`}
+                    title={trip.tripName}
+                    badge={tripEntryCount}
+                    open={tripOpen}
+                    onToggle={() => toggleTrip(trip.tripNumber)}
                   >
-                    {name}
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    {trip.folders.length === 0 ? (
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        No folders
+                      </p>
+                    ) : (
+                      <div className="border border-[var(--border)]">
+                        {trip.folders.map((folder) => {
+                          const fKey = `${trip.tripNumber}:${folder.foldername}`;
+                          const folderOpen = openFolders.has(fKey);
+                          return (
+                            <AccordionItem
+                              key={fKey}
+                              id={fKey}
+                              title={folder.foldername}
+                              badge={folder.entries.length}
+                              open={folderOpen}
+                              onToggle={() => toggleFolder(fKey)}
+                            >
+                              {folder.entries.length === 0 ? (
+                                <p className="text-xs text-[var(--muted-foreground)]">
+                                  No entries
+                                </p>
+                              ) : (
+                                <ul className="space-y-1">
+                                  {folder.entries.map((name) => {
+                                    const active =
+                                      selected?.tripNumber ===
+                                        trip.tripNumber &&
+                                      selected.foldername ===
+                                        folder.foldername &&
+                                      selected.name === name;
+                                    return (
+                                      <li key={name}>
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "w-full rounded-md px-2 py-1.5 text-left text-sm",
+                                            active
+                                              ? "bg-[var(--muted)] font-medium text-[var(--secondary)] dark:text-[var(--primary)]"
+                                              : "hover:bg-[var(--muted)]",
+                                          )}
+                                          onClick={() =>
+                                            void selectEntry({
+                                              tripName: trip.tripName,
+                                              tripNumber: trip.tripNumber,
+                                              foldername: folder.foldername,
+                                              name,
+                                            })
+                                          }
+                                        >
+                                          {name}
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                            </AccordionItem>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
           )}
         </div>
       </aside>
 
-      <section className="min-w-0 flex-1 space-y-3">
+      {/* ~70% content */}
+      <section className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-6">
         {error && (
-          <p className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+          <p className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
             {error}
           </p>
         )}
         {status && (
-          <p className="text-sm text-[var(--muted-foreground)]">{status}</p>
+          <p className="mb-2 text-sm text-[var(--muted-foreground)]">{status}</p>
         )}
 
         {!selected ? (
-          <p className="py-16 text-center text-sm text-[var(--muted-foreground)]">
-            Select or create an entry.
-          </p>
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-xl font-medium text-[var(--muted-foreground)] sm:text-2xl">
+              Select Journal Entry
+            </p>
+          </div>
+        ) : entryLoading ? (
+          <p className="text-sm text-[var(--muted-foreground)]">Loading entry…</p>
         ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-medium">{selected}</h2>
-              <div className="ml-auto flex gap-2">
+          <div className="mx-auto w-full max-w-3xl space-y-4">
+            <div className="flex flex-wrap items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {selected.tripName} · {selected.foldername}
+                </p>
+                <h2 className="text-xl font-semibold">{selected.name}</h2>
+              </div>
+              <div className="flex gap-2">
                 <Button
                   type="button"
                   size="sm"
@@ -289,14 +297,13 @@ export function JournalPageClient() {
               </div>
             </div>
 
-            <Label htmlFor="story">Story</Label>
             <textarea
-              id="story"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              rows={16}
+              rows={18}
               className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               placeholder="Write notes…"
+              aria-label="Journal entry text"
             />
 
             <div>
@@ -318,7 +325,7 @@ export function JournalPageClient() {
                 </ul>
               )}
             </div>
-          </>
+          </div>
         )}
       </section>
     </div>

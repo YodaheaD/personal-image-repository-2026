@@ -114,16 +114,29 @@ export interface PaginatedResponse {
 export interface JournalEntry {
   name: string;
   folder?: string;
+  foldername?: string;
+  tripName?: string;
+  tripNumber?: number;
   text?: string;
   story?: string;
   images?: string[];
   [key: string]: unknown;
 }
 
+/** Raw returnList envelope — prefer parseJournalHierarchy(). */
 export interface JournalListResponse {
+  trips?: unknown;
+  Trips?: unknown;
+  data?: unknown;
   folders?: string[];
   names?: string[];
   entries?: JournalEntry[];
-  data?: JournalEntry[] | Record<string, unknown>;
   [key: string]: unknown;
+}
+
+export interface JournalReturnTextParams {
+  name: string;
+  folder?: string;
+  tripName?: string;
+  tripNumber?: number;
 }
