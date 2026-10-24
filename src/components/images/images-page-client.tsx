@@ -14,6 +14,7 @@ import type { DateRangeResult } from "@/components/images/date-range-search";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { Button } from "@/components/ui/button";
 import {
+  fetchCascadeFilters,
   fetchFilters,
   fetchPaginated,
   imagesFromPaginated,
@@ -21,7 +22,11 @@ import {
 import type { ImageRecord, PaginatedParams } from "@/lib/api/types";
 import {
   hasLocationSelection,
+  parseFilterBundles,
   parseFilterCatalog,
+  pruneInvalidDescendants,
+  selectionsEqual,
+  type FilterBundles,
   type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
@@ -37,6 +42,8 @@ export function ImagesPageClient() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [catalog, setCatalog] = useState<FilterCatalog>({});
+  const [bundles, setBundles] = useState<FilterBundles>({});
+  const [cascadeAllowed, setCascadeAllowed] = useState<FilterCatalog>({});
   const [selected, setSelected] = useState<SelectedFilters>({});
   const [searchQuery, setSearchQuery] = useState(
     () => searchParams.get("searchQuery") ?? "",
@@ -63,6 +70,7 @@ export function ImagesPageClient() {
       .then((res) => {
         if (cancelled) return;
         setCatalog(parseFilterCatalog(res));
+        setBundles(parseFilterBundles(res));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -75,6 +83,44 @@ export function ImagesPageClient() {
       cancelled = true;
     };
   }, []);
+
+  // Prefer cascadeFilters API; fall back to client walk of getFilters.bundles.
+  const selectedKey = JSON.stringify(selected);
+  useEffect(() => {
+    let cancelled = false;
+    if (!hasLocationSelection(selected)) {
+      setCascadeAllowed({});
+      return;
+    }
+    fetchCascadeFilters(selected)
+      .then((allowed) => {
+        if (cancelled) return;
+        const cascadeOpts =
+          allowed == null
+            ? { bundles }
+            : { bundles, cascadeAllowed: allowed };
+        if (allowed == null) setCascadeAllowed({});
+        else setCascadeAllowed(allowed);
+
+        setSelected((prev) => {
+          const pruned = pruneInvalidDescendants(
+            prev,
+            "country",
+            catalog,
+            cascadeOpts,
+          );
+          return selectionsEqual(prev, pruned) ? prev : pruned;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setCascadeAllowed({});
+      });
+    return () => {
+      cancelled = true;
+    };
+    // selectedKey avoids identity churn; re-run when catalog/bundles load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, catalog, bundles]);
 
   const loadImages = useCallback(async () => {
     setLoading(true);
@@ -194,6 +240,8 @@ export function ImagesPageClient() {
         {sidebarOpen && (
           <FilterSidebar
             catalog={catalog}
+            bundles={bundles}
+            cascadeAllowed={cascadeAllowed}
             selected={selected}
             onSelectedChange={onLocationChange}
             onDateSearch={onDateSearch}

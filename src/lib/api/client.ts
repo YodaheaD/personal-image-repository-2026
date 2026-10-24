@@ -4,6 +4,11 @@ import type {
   PaginatedParams,
   PaginatedResponse,
 } from "@/lib/api/types";
+import {
+  parseFilterCatalog,
+  type FilterCatalog,
+  type SelectedFilters,
+} from "@/lib/filters";
 import { parseReturnTextBody } from "@/lib/journal-hierarchy";
 
 /** Browser Axios client → Next.js BFF proxy (injects function key server-side). */
@@ -55,6 +60,36 @@ export function buildPaginatedSearchParams(
 export async function fetchFilters(): Promise<FiltersResponse> {
   const { data } = await api.get<FiltersResponse>("/main/utils/getFilters");
   return data;
+}
+
+/**
+ * Cascade options for lower levels given current location multi-select.
+ * GET /main/utils/cascadeFilters?country=Spain&city=Madrid…
+ * → { state?: string[], country2?: string[], city?: string[], … }
+ * (descendants under selected parents; OR within level).
+ * Returns null if the endpoint is unavailable (404) so UI can fall back to bundles.
+ */
+export async function fetchCascadeFilters(
+  selected: SelectedFilters,
+): Promise<FilterCatalog | null> {
+  const qs = new URLSearchParams();
+  for (const key of LOCATION_KEYS) {
+    const values = selected[key];
+    if (!values?.length) continue;
+    for (const v of values) qs.append(key, v);
+  }
+  if ([...qs.keys()].length === 0) return {};
+
+  try {
+    const { data, status } = await api.get<unknown>(
+      `/main/utils/cascadeFilters?${qs.toString()}`,
+      { validateStatus: (s) => (s >= 200 && s < 300) || s === 404 },
+    );
+    if (status === 404 || data == null) return null;
+    return parseFilterCatalog(data);
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchPaginated(

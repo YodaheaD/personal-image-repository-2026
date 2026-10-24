@@ -9,15 +9,19 @@ import {
   FILTER_LEVEL_LABELS,
 } from "@/lib/api/types";
 import {
+  hasAncestorSelection,
   hasLocationSelection,
   optionsForLevel,
   toggleFilterValue,
+  type FilterBundles,
   type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
 
 interface Props {
   catalog: FilterCatalog;
+  bundles?: FilterBundles;
+  cascadeAllowed?: FilterCatalog;
   selected: SelectedFilters;
   onSelectedChange: (next: SelectedFilters) => void;
   onDateSearch: (range: DateRangeResult) => void;
@@ -28,6 +32,8 @@ interface Props {
 
 export function FilterSidebar({
   catalog,
+  bundles,
+  cascadeAllowed,
   selected,
   onSelectedChange,
   onDateSearch,
@@ -36,9 +42,12 @@ export function FilterSidebar({
   hasDateRange,
 }: Props) {
   const { isOpen, toggle } = useOpenSet(["country", "dateTaken"]);
+  const cascadeOpts = { bundles, cascadeAllowed };
 
   function onToggleValue(level: FilterLevel, value: string) {
-    onSelectedChange(toggleFilterValue(selected, level, value, catalog));
+    onSelectedChange(
+      toggleFilterValue(selected, level, value, catalog, cascadeOpts),
+    );
   }
 
   return (
@@ -51,16 +60,21 @@ export function FilterSidebar({
       </div>
 
       {(hasLocationSelection(selected) || hasDateRange) && (
-        <p className="border-b border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
+        <p className="shrink-0 border-b border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
           Location and dateTaken are mutually exclusive — applying one clears
-          the other.
+          the other. Lower filter levels follow selected parents.
         </p>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <Accordion>
           {FILTER_ACCORDION_ORDER.map((level) => {
-            const options = optionsForLevel(catalog, level, selected);
+            const options = optionsForLevel(
+              catalog,
+              level,
+              selected,
+              cascadeOpts,
+            );
             const checked = selected[level] ?? [];
             return (
               <AccordionItem
@@ -73,7 +87,9 @@ export function FilterSidebar({
               >
                 {options.length === 0 ? (
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    No options
+                    {level !== "country" && hasAncestorSelection(selected, level)
+                      ? "No matching options under selection"
+                      : "No options"}
                   </p>
                 ) : (
                   <ul className="max-h-48 space-y-1 overflow-y-auto">
@@ -94,7 +110,9 @@ export function FilterSidebar({
                               disabled={disabled}
                               onChange={() => onToggleValue(level, opt)}
                             />
-                            <span className="break-words leading-snug">{opt}</span>
+                            <span className="break-words leading-snug">
+                              {opt}
+                            </span>
                           </label>
                         </li>
                       );
@@ -112,7 +130,11 @@ export function FilterSidebar({
             open={isOpen("dateTaken")}
             onToggle={() => toggle("dateTaken")}
           >
-            <DateRangeSearch disabled={disabled} onSearch={onDateSearch} compact />
+            <DateRangeSearch
+              disabled={disabled}
+              onSearch={onDateSearch}
+              compact
+            />
           </AccordionItem>
         </Accordion>
       </div>

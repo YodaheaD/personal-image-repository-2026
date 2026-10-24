@@ -48,12 +48,14 @@ export interface FilterBundle {
 }
 
 /**
- * getFilters body is a flat level → string[] map (Functions contract).
- * Legacy `{ filters, filterbundles }` may still appear elsewhere.
+ * getFilters (Functions PR #7): flat level → string[] plus optional
+ * `bundles: { country: { Spain: string[] }, state: {...}, ... }`.
+ * Do not treat `bundles` as a filter level.
  */
-export type FiltersResponse = Partial<
-  Record<FilterLevel, string[]>
-> & {
+export type FiltersResponse = Partial<Record<FilterLevel, string[]>> & {
+  bundles?: Partial<
+    Record<FilterLevel, Record<string, string[]>>
+  >;
   filters?: FilterRow[] | Record<string, string[]>;
   filterbundles?: FilterBundle[] | Record<string, string[]>;
   returnedFilters?: FilterRow[] | Record<string, string[]>;
