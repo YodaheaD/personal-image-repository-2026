@@ -1,11 +1,10 @@
 import axios, { type AxiosInstance } from "axios";
 import type {
   FiltersResponse,
-  JournalEntry,
-  JournalListResponse,
   PaginatedParams,
   PaginatedResponse,
 } from "@/lib/api/types";
+import { parseReturnTextBody } from "@/lib/journal-hierarchy";
 
 /** Browser Axios client → Next.js BFF proxy (injects function key server-side). */
 export const api: AxiosInstance = axios.create({
@@ -72,23 +71,34 @@ export function imagesFromPaginated(res: PaginatedResponse) {
   return res.data ?? res.images ?? res.items ?? [];
 }
 
-/** Journal paths mirror Functions handlers (CRUD). */
-export async function journalReturnList(): Promise<JournalListResponse> {
-  const { data } = await api.get<JournalListResponse>("/journal/returnList");
+/** Journal paths — Functions PR #5 contract. */
+export async function journalReturnList(): Promise<unknown> {
+  const { data } = await api.get<unknown>("/journal/returnList");
   return data;
 }
 
-export async function journalReturnText(name: string): Promise<JournalEntry> {
-  const { data } = await api.get<JournalEntry>("/journal/returnText", {
-    params: { name },
+/**
+ * GET /journal/returnText?foldername&name → [text, images] or 204.
+ */
+export async function journalReturnText(params: {
+  foldername: string;
+  name: string;
+}): Promise<{ text: string; images: string[]; empty: boolean }> {
+  const { data, status } = await api.get<unknown>("/journal/returnText", {
+    params: { foldername: params.foldername, name: params.name },
+    validateStatus: (s) => (s >= 200 && s < 300) || s === 204,
   });
-  return data;
+  if (status === 204 || data == null || data === "") {
+    return { text: "", images: [], empty: true };
+  }
+  const parsed = parseReturnTextBody(data);
+  return { ...parsed, empty: false };
 }
 
 export async function journalEditStory(payload: {
+  foldername: string;
   name: string;
-  text?: string;
-  story?: string;
+  data: string;
 }): Promise<unknown> {
   const { data } = await api.post("/journal/editStory", payload);
   return data;
@@ -97,13 +107,19 @@ export async function journalEditStory(payload: {
 export async function journalAddName(payload: {
   name: string;
   folder?: string;
+  foldername?: string;
 }): Promise<unknown> {
-  const { data } = await api.post("/journal/addname", payload);
+  const { data } = await api.post("/journal/addname", {
+    name: payload.name,
+    folder: payload.foldername ?? payload.folder,
+    foldername: payload.foldername ?? payload.folder,
+  });
   return data;
 }
 
 export async function journalDeleteName(payload: {
   name: string;
+  foldername?: string;
 }): Promise<unknown> {
   const { data } = await api.post("/journal/deleteName", payload);
   return data;
