@@ -17,6 +17,7 @@ import {
   yearOptions,
   type DateParts,
 } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 
 export interface DateRangeResult {
   startDate?: number;
@@ -26,6 +27,7 @@ export interface DateRangeResult {
 interface Props {
   onSearch: (range: DateRangeResult) => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 const empty: DateParts = { day: 0, month: 0, year: 0 };
@@ -34,10 +36,12 @@ function PartSelects({
   label,
   value,
   onChange,
+  compact,
 }: {
   label: string;
   value: DateParts;
   onChange: (next: DateParts) => void;
+  compact?: boolean;
 }) {
   const years = useMemo(() => yearOptions(), []);
   const days = useMemo(
@@ -47,13 +51,13 @@ function PartSelects({
 
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <div className="flex flex-wrap gap-2">
+      <Label className="text-xs">{label}</Label>
+      <div className={cn("flex flex-wrap gap-1.5", compact && "gap-1")}>
         <Select
           value={value.day ? String(value.day) : undefined}
           onValueChange={(v) => onChange({ ...value, day: Number(v) })}
         >
-          <SelectTrigger className="w-[4.5rem]" aria-label={`${label} day`}>
+          <SelectTrigger className="w-[4.25rem]" aria-label={`${label} day`}>
             <SelectValue placeholder="DD" />
           </SelectTrigger>
           <SelectContent>
@@ -68,7 +72,7 @@ function PartSelects({
           value={value.month ? String(value.month) : undefined}
           onValueChange={(v) => onChange({ ...value, month: Number(v) })}
         >
-          <SelectTrigger className="w-[4.5rem]" aria-label={`${label} month`}>
+          <SelectTrigger className="w-[4.25rem]" aria-label={`${label} month`}>
             <SelectValue placeholder="MM" />
           </SelectTrigger>
           <SelectContent>
@@ -83,7 +87,7 @@ function PartSelects({
           value={value.year ? String(value.year) : undefined}
           onValueChange={(v) => onChange({ ...value, year: Number(v) })}
         >
-          <SelectTrigger className="w-[5.5rem]" aria-label={`${label} year`}>
+          <SelectTrigger className="w-[5.25rem]" aria-label={`${label} year`}>
             <SelectValue placeholder="YYYY" />
           </SelectTrigger>
           <SelectContent>
@@ -99,7 +103,7 @@ function PartSelects({
   );
 }
 
-export function DateRangeSearch({ onSearch, disabled }: Props) {
+export function DateRangeSearch({ onSearch, disabled, compact }: Props) {
   const [start, setStart] = useState<DateParts>(empty);
   const [stop, setStop] = useState<DateParts>(empty);
   const [error, setError] = useState<string | null>(null);
@@ -144,24 +148,31 @@ export function DateRangeSearch({ onSearch, disabled }: Props) {
   }
 
   return (
-    <div className="space-y-3 rounded-md border border-[var(--border)] p-3">
-      <p className="text-sm font-medium text-[var(--foreground)]">Date taken</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <PartSelects label="Start" value={start} onChange={setStart} />
-        <PartSelects label="Stop" value={stop} onChange={setStop} />
+    <div className={cn("space-y-3", !compact && "rounded-md border border-[var(--border)] p-3")}>
+      {!compact && (
+        <p className="text-sm font-medium text-[var(--foreground)]">Date taken</p>
+      )}
+      <div className="grid gap-3">
+        <PartSelects label="Start" value={start} onChange={setStart} compact={compact} />
+        <PartSelects label="Stop" value={stop} onChange={setStop} compact={compact} />
       </div>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={handleSearch} disabled={disabled}>
+        <Button type="button" size="sm" onClick={handleSearch} disabled={disabled}>
           Search
         </Button>
-        <Button type="button" variant="outline" onClick={clear} disabled={disabled}>
-          Clear dates
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={clear}
+          disabled={disabled}
+        >
+          Clear
         </Button>
       </div>
       <p className="text-xs text-[var(--muted-foreground)]">
-        Date range is sent only when you click Search (`startDate` / `endDate`
-        as epoch ms UTC).
+        Date range sent only on Search (`startDate` / `endDate` epoch ms UTC).
       </p>
     </div>
   );

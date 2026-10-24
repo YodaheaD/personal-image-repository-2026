@@ -1,4 +1,4 @@
-/** Location hierarchy levels used by FiltersTable + cascading UI. */
+/** Location hierarchy for FiltersTable cascade (parent → child). */
 export const FILTER_LEVELS = [
   "country",
   "state",
@@ -10,8 +10,24 @@ export const FILTER_LEVELS = [
 
 export type FilterLevel = (typeof FILTER_LEVELS)[number];
 
-/** Levels accepted by GET /api/main/paginated. */
-export type PaginatedLocationKey = "country" | "state" | "city" | "area";
+/** Accordion display order on /images (per redesign). */
+export const FILTER_ACCORDION_ORDER: FilterLevel[] = [
+  "country",
+  "state",
+  "city",
+  "area",
+  "country2",
+  "neighborhood",
+];
+
+export const FILTER_LEVEL_LABELS: Record<FilterLevel, string> = {
+  country: "Country",
+  state: "State",
+  country2: "Country 2",
+  city: "City",
+  area: "Area",
+  neighborhood: "Neighborhood",
+};
 
 export interface FilterRow {
   PartitionKey?: string;
@@ -42,9 +58,13 @@ export interface ImageRecord {
   PartitionKey?: string;
   RowKey?: string;
   name?: string;
+  /** Prefer for gallery — compressedimages `.webp` (same as compressedUrl). */
+  thumbnailUrl?: string;
+  /** Prefer for gallery — compressedimages `.webp`. */
+  compressedUrl?: string;
+  /** Remapped server-side to compressed; UI should not prefer these. */
   blobUrl?: string;
   url?: string;
-  thumbnailUrl?: string;
   dateTaken?: number | string;
   country?: string;
   state?: string;
@@ -52,17 +72,26 @@ export interface ImageRecord {
   area?: string;
   neighborhood?: string;
   country2?: string;
+  /** Client-only resolved display URL (never HEIC). */
+  _displayUrl?: string;
   [key: string]: unknown;
 }
 
+/**
+ * Paginated query params.
+ * Location fields: multi-select as comma-separated values
+ * (OR within a level, AND across levels) — Functions IRF-8.
+ */
 export interface PaginatedParams {
   page?: number;
   limit?: number;
   sortOrder?: "asc" | "desc";
-  country?: string;
-  state?: string;
-  city?: string;
-  area?: string;
+  country?: string | string[];
+  state?: string | string[];
+  city?: string | string[];
+  area?: string | string[];
+  country2?: string | string[];
+  neighborhood?: string | string[];
   searchQuery?: string;
   /** Inclusive lower bound on dateTaken — epoch ms UTC */
   startDate?: number;

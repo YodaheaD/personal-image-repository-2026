@@ -14,15 +14,43 @@ export const api: AxiosInstance = axios.create({
   timeout: 60_000,
 });
 
-function cleanParams(
-  params: Record<string, string | number | undefined | null>,
-): Record<string, string | number> {
-  const out: Record<string, string | number> = {};
-  for (const [k, v] of Object.entries(params)) {
-    if (v === undefined || v === null || v === "") continue;
-    out[k] = v;
+const LOCATION_KEYS = [
+  "country",
+  "state",
+  "country2",
+  "city",
+  "area",
+  "neighborhood",
+] as const;
+
+/**
+ * Serialize paginated params for Functions PR #4:
+ * location multi-select as repeated keys (also accepts comma-separated server-side).
+ * OR within level, AND across levels.
+ */
+export function buildPaginatedSearchParams(
+  params: PaginatedParams,
+): URLSearchParams {
+  const qs = new URLSearchParams();
+  qs.set("page", String(params.page ?? 1));
+  qs.set("limit", String(params.limit ?? 50));
+  if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
+  if (params.searchQuery) qs.set("searchQuery", params.searchQuery);
+  if (params.startDate != null) qs.set("startDate", String(params.startDate));
+  if (params.endDate != null) qs.set("endDate", String(params.endDate));
+
+  for (const key of LOCATION_KEYS) {
+    const raw = params[key];
+    if (raw == null || raw === "") continue;
+    const values = Array.isArray(raw)
+      ? raw
+      : String(raw)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+    for (const v of values) qs.append(key, v);
   }
-  return out;
+  return qs;
 }
 
 export async function fetchFilters(): Promise<FiltersResponse> {
@@ -33,20 +61,10 @@ export async function fetchFilters(): Promise<FiltersResponse> {
 export async function fetchPaginated(
   params: PaginatedParams,
 ): Promise<PaginatedResponse> {
-  const { data } = await api.get<PaginatedResponse>("/main/paginated", {
-    params: cleanParams({
-      page: params.page ?? 1,
-      limit: params.limit ?? 50,
-      sortOrder: params.sortOrder,
-      country: params.country,
-      state: params.state,
-      city: params.city,
-      area: params.area,
-      searchQuery: params.searchQuery,
-      startDate: params.startDate,
-      endDate: params.endDate,
-    }),
-  });
+  const qs = buildPaginatedSearchParams(params);
+  const { data } = await api.get<PaginatedResponse>(
+    `/main/paginated?${qs.toString()}`,
+  );
   return data;
 }
 
