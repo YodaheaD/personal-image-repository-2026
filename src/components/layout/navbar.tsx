@@ -6,8 +6,12 @@ import { Cloud, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { fetchFilters } from "@/lib/api/client";
-import type { FilterRow } from "@/lib/api/types";
-import { allFilterValues, matchFilterValues } from "@/lib/filters";
+import {
+  allFilterValues,
+  matchFilterValues,
+  parseFilterCatalog,
+  type FilterCatalog,
+} from "@/lib/filters";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -20,7 +24,7 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<FilterRow[]>([]);
+  const [catalog, setCatalog] = useState<FilterCatalog>({});
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -28,7 +32,7 @@ export function Navbar() {
     fetchFilters()
       .then((res) => {
         if (cancelled) return;
-        setFilters(res.filters ?? res.returnedFilters ?? []);
+        setCatalog(parseFilterCatalog(res));
       })
       .catch(() => {
         /* filters unavailable offline — search suggestions empty */
@@ -38,7 +42,7 @@ export function Navbar() {
     };
   }, []);
 
-  const values = useMemo(() => allFilterValues(filters), [filters]);
+  const values = useMemo(() => allFilterValues(catalog), [catalog]);
   const matches = useMemo(
     () => (query.trim() ? matchFilterValues(values, query).slice(0, 12) : []),
     [values, query],

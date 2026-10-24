@@ -1,95 +1,107 @@
-import type { FilterBundle, FilterLevel, FilterRow } from "@/lib/api/types";
+import type { FilterLevel } from "@/lib/api/types";
 import { FILTER_LEVELS } from "@/lib/api/types";
 
 /** Multi-select location filters. */
 export type SelectedFilters = Partial<Record<FilterLevel, string[]>>;
 
-function levelOf(row: FilterRow): string {
-  return String(row.PartitionKey ?? row.level ?? "").toLowerCase();
+/**
+ * Flat getFilters catalog — Functions contract:
+ * `{ country: string[], state: string[], ... }`
+ * (not `{ filters, filterbundles }`).
+ */
+export type FilterCatalog = Partial<Record<FilterLevel, string[]>>;
+
+function isFilterLevel(key: string): key is FilterLevel {
+  return (FILTER_LEVELS as readonly string[]).includes(key);
 }
 
-function childrenOf(
-  bundles: FilterBundle[] | Record<string, string[]> | undefined,
-  parentName: string,
-): string[] {
-  if (!bundles) return [];
-  if (Array.isArray(bundles)) {
-    const hit = bundles.find(
-      (b) =>
-        b.name === parentName ||
-        b.RowKey === parentName ||
-        b.PartitionKey === parentName,
-    );
-    return hit?.children ?? [];
+/** Normalize getFilters / returnedFilters payloads into a flat catalog. */
+export function parseFilterCatalog(payload: unknown): FilterCatalog {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {};
   }
-  return bundles[parentName] ?? [];
+  const root = payload as Record<string, unknown>;
+
+  // Legacy wrappers — prefer nested catalog if present, else ignore empty wrappers
+  const nested =
+    root.filters &&
+    typeof root.filters === "object" &&
+    !Array.isArray(root.filters)
+      ? (root.filters as Record<string, unknown>)
+      : root.returnedFilters &&
+          typeof root.returnedFilters === "object" &&
+          !Array.isArray(root.returnedFilters)
+        ? (root.returnedFilters as Record<string, unknown>)
+        : null;
+
+  // Legacy array of FilterRow { PartitionKey, name }
+  if (Array.isArray(root.filters) || Array.isArray(root.returnedFilters)) {
+    const rows = (Array.isArray(root.filters)
+      ? root.filters
+      : root.returnedFilters) as unknown[];
+    const catalog: FilterCatalog = {};
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const level = String(o.PartitionKey ?? o.level ?? "").toLowerCase();
+      const name = String(o.name ?? "").trim();
+      if (!isFilterLevel(level) || !name) continue;
+      const list = catalog[level] ?? [];
+      if (!list.includes(name)) list.push(name);
+      catalog[level] = list;
+    }
+    for (const level of FILTER_LEVELS) {
+      if (catalog[level]) {
+        catalog[level] = [...catalog[level]!].sort((a, b) =>
+          a.localeCompare(b),
+        );
+      }
+    }
+    return catalog;
+  }
+
+  const source = nested ?? root;
+  const catalog: FilterCatalog = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (!isFilterLevel(key)) continue;
+    if (!Array.isArray(value)) continue;
+    const names = [
+      ...new Set(
+        value
+          .map((v) => (typeof v === "string" ? v.trim() : String(v ?? "").trim()))
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+    catalog[key] = names;
+  }
+  return catalog;
 }
 
-function allNamesAtLevel(filters: FilterRow[], level: FilterLevel): string[] {
-  const names = filters
-    .filter((f) => levelOf(f) === level)
-    .map((f) => f.name)
-    .filter(Boolean);
-  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+function namesAtLevel(catalog: FilterCatalog, level: FilterLevel): string[] {
+  return catalog[level] ?? [];
 }
 
 /**
- * Options for a level.
- * - Country (root): always all values.
- * - Deeper levels: if any immediate parents selected → union of their children
- *   (filterbundles); else all values at that level.
+ * Options for a level from the flat catalog.
+ * Without filterbundles, show the full list for each level (still useful);
+ * when parents are selected and we have no bundles, keep showing the full
+ * child-level list (server AND-filters across levels on apply).
  */
 export function optionsForLevel(
-  filters: FilterRow[],
-  bundles: FilterBundle[] | Record<string, string[]> | undefined,
+  catalog: FilterCatalog,
   level: FilterLevel,
-  selected: SelectedFilters,
+  _selected: SelectedFilters,
 ): string[] {
-  const levelIndex = FILTER_LEVELS.indexOf(level);
-  if (levelIndex < 0) return [];
-
-  if (levelIndex === 0) {
-    return allNamesAtLevel(filters, level);
-  }
-
-  const parentLevel = FILTER_LEVELS[levelIndex - 1];
-  const parents = selected[parentLevel] ?? [];
-
-  if (parents.length === 0) {
-    return allNamesAtLevel(filters, level);
-  }
-
-  const fromBundles = new Set<string>();
-  let anyBundleHit = false;
-  for (const parent of parents) {
-    const kids = childrenOf(bundles, parent);
-    if (kids.length > 0) {
-      anyBundleHit = true;
-      for (const k of kids) fromBundles.add(k);
-    }
-  }
-  if (anyBundleHit) {
-    return [...fromBundles].sort((a, b) => a.localeCompare(b));
-  }
-
-  const fromRows = filters
-    .filter(
-      (f) =>
-        levelOf(f) === level &&
-        (!f.parentName || parents.includes(String(f.parentName))),
-    )
-    .map((f) => f.name)
-    .filter(Boolean);
-  return [...new Set(fromRows)].sort((a, b) => a.localeCompare(b));
+  void _selected;
+  return namesAtLevel(catalog, level);
 }
 
-/** Toggle a value; prune invalid descendants when selection shrinks. */
+/** Toggle a value; prune descendants that are no longer in the catalog. */
 export function toggleFilterValue(
   selected: SelectedFilters,
   level: FilterLevel,
   value: string,
-  filters: FilterRow[],
-  bundles: FilterBundle[] | Record<string, string[]> | undefined,
+  catalog: FilterCatalog,
 ): SelectedFilters {
   const current = selected[level] ?? [];
   const nextValues = current.includes(value)
@@ -100,21 +112,19 @@ export function toggleFilterValue(
   if (nextValues.length === 0) delete next[level];
   else next[level] = nextValues;
 
-  return pruneInvalidDescendants(next, level, filters, bundles);
+  return pruneInvalidDescendants(next, level, catalog);
 }
 
-/** After a level changes, drop child selections that are no longer options. */
 export function pruneInvalidDescendants(
   selected: SelectedFilters,
   changedLevel: FilterLevel,
-  filters: FilterRow[],
-  bundles: FilterBundle[] | Record<string, string[]> | undefined,
+  catalog: FilterCatalog,
 ): SelectedFilters {
   const start = FILTER_LEVELS.indexOf(changedLevel);
   const next: SelectedFilters = { ...selected };
   for (let i = start + 1; i < FILTER_LEVELS.length; i += 1) {
     const level = FILTER_LEVELS[i];
-    const allowed = new Set(optionsForLevel(filters, bundles, level, next));
+    const allowed = new Set(namesAtLevel(catalog, level));
     const cur = next[level];
     if (!cur?.length) continue;
     const kept = cur.filter((v) => allowed.has(v));
@@ -133,11 +143,13 @@ export function toCommaParam(values: string[] | undefined): string | undefined {
   return values.join(",");
 }
 
-/** Flatten all filter value names for global navbar search (not image names). */
-export function allFilterValues(filters: FilterRow[]): string[] {
-  return [...new Set(filters.map((f) => f.name).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b),
-  );
+/** Flatten all filter value names for global navbar search. */
+export function allFilterValues(catalog: FilterCatalog): string[] {
+  const names = new Set<string>();
+  for (const level of FILTER_LEVELS) {
+    for (const n of catalog[level] ?? []) names.add(n);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
 }
 
 export function matchFilterValues(values: string[], query: string): string[] {
@@ -151,4 +163,8 @@ export function matchFilterValues(values: string[], query: string): string[] {
     const lower = v.toLowerCase();
     return tokens.every((t) => lower.includes(t));
   });
+}
+
+export function catalogHasOptions(catalog: FilterCatalog): boolean {
+  return FILTER_LEVELS.some((l) => (catalog[l]?.length ?? 0) > 0);
 }
