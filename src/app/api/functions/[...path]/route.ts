@@ -35,9 +35,10 @@ async function proxy(req: NextRequest, pathParts: string[]) {
   const key = functionsKey();
   const path = pathParts.join("/");
   const url = new URL(`${base}/${path}`);
-  req.nextUrl.searchParams.forEach((value, keyName) => {
-    url.searchParams.set(keyName, value);
-  });
+  // Preserve repeated keys (multi-select location filters).
+  for (const [keyName, value] of req.nextUrl.searchParams.entries()) {
+    url.searchParams.append(keyName, value);
+  }
 
   let body: unknown = undefined;
   if (req.method !== "GET" && req.method !== "HEAD") {
