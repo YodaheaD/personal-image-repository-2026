@@ -19,6 +19,34 @@ function imageTitle(img: ImageRecord): string {
   return String(img.name || img.RowKey || img.PartitionKey || "Image");
 }
 
+/**
+ * Azure blob URLs are loaded with unoptimized next/image so the App Service
+ * never proxies them through /_next/image (409 when the optimizer cannot
+ * anonymously fetch private compressedimages blobs).
+ */
+function BlobImage({
+  src,
+  alt,
+  className,
+  sizes,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  sizes?: string;
+}) {
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes={sizes}
+      unoptimized
+      className={className}
+    />
+  );
+}
+
 export function ImageGallery({ images }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -52,12 +80,10 @@ export function ImageGallery({ images }: Props) {
                   className="relative aspect-square w-full overflow-hidden rounded-md border border-[var(--border)] bg-[var(--muted)] text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                   aria-label={`Open metadata for ${title}`}
                 >
-                  <Image
+                  <BlobImage
                     src={src}
                     alt={title}
-                    fill
                     sizes="(max-width:640px) 50vw, (max-width:768px) 33vw, (max-width:1024px) 25vw, (max-width:1280px) 20vw, 16vw"
-                    quality={50}
                     className="object-cover"
                   />
                 </button>
@@ -68,12 +94,10 @@ export function ImageGallery({ images }: Props) {
               >
                 <p className="mb-2 text-sm font-semibold">{title}</p>
                 <div className="relative mb-3 h-40 w-full">
-                  <Image
+                  <BlobImage
                     src={src}
                     alt=""
-                    fill
                     sizes="320px"
-                    quality={50}
                     className="rounded object-contain"
                   />
                 </div>
