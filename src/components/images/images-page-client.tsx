@@ -165,7 +165,7 @@ export function ImagesPageClient() {
     dateRange.startDate != null || dateRange.endDate != null;
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 overflow-hidden">
       <div className="flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--background)]">
         <Button
           type="button"
@@ -186,23 +186,21 @@ export function ImagesPageClient() {
 
       <aside
         className={cn(
-          "min-h-0 shrink-0 overflow-hidden border-r border-[var(--border)] bg-[var(--background)]",
-          sidebarOpen ? "w-72 sm:w-80" : "w-0 border-r-0",
+          "flex min-h-0 shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--background)]",
+          sidebarOpen ? "h-full w-72 sm:w-80" : "w-0 border-r-0",
         )}
         aria-hidden={!sidebarOpen}
       >
         {sidebarOpen && (
-          <div className="h-full overflow-y-auto">
-            <FilterSidebar
-              catalog={catalog}
-              selected={selected}
-              onSelectedChange={onLocationChange}
-              onDateSearch={onDateSearch}
-              onReset={resetAll}
-              disabled={loading}
-              hasDateRange={hasDateRange}
-            />
-          </div>
+          <FilterSidebar
+            catalog={catalog}
+            selected={selected}
+            onSelectedChange={onLocationChange}
+            onDateSearch={onDateSearch}
+            onReset={resetAll}
+            disabled={loading}
+            hasDateRange={hasDateRange}
+          />
         )}
       </aside>
 

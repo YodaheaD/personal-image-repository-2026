@@ -134,9 +134,9 @@ export function JournalPageClient() {
   const entryCount = countEntries(hierarchy);
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col md:flex-row">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden md:flex-row">
       {/* ~30% hierarchy sidebar */}
-      <aside className="flex w-full shrink-0 flex-col border-b border-[var(--border)] md:w-[30%] md:min-w-[16rem] md:max-w-sm md:border-b-0 md:border-r">
+      <aside className="flex max-h-[40vh] w-full shrink-0 flex-col overflow-hidden border-b border-[var(--border)] md:max-h-none md:h-full md:w-[30%] md:min-w-[16rem] md:max-w-sm md:border-b-0 md:border-r">
         <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-3">
           <div>
             <h1 className="text-lg font-semibold">Journal</h1>
@@ -250,7 +250,7 @@ export function JournalPageClient() {
       </aside>
 
       {/* ~70% content */}
-      <section className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-6">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6">
         {error && (
           <p className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
             {error}

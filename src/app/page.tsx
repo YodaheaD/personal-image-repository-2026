@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16">
+    <div className="mx-auto h-full max-w-3xl overflow-y-auto px-4 py-16">
       <h1 className="text-2xl font-semibold tracking-tight text-[var(--secondary)] dark:text-[var(--primary)]">
         image Repo
       </h1>
