@@ -46,3 +46,14 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Landing atmosphere — soft primary wash over muted→background */
+.landing-bg {
+  background:
+    radial-gradient(
+      ellipse at top,
+      color-mix(in srgb, var(--primary) 18%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, var(--muted) 0%, var(--background) 55%);
+}
+

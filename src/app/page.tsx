@@ -1,28 +1,31 @@
-import Link from "next/link";
+import { Cloud } from "lucide-react";
+import { SignInButton } from "@/components/auth/sign-in-button";
 
-export default function HomePage() {
+export default function LandingPage() {
   return (
-    <div className="mx-auto h-full max-w-3xl overflow-y-auto px-4 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight text-[var(--secondary)] dark:text-[var(--primary)]">
-        image Repo
-      </h1>
-      <p className="mt-3 max-w-prose text-[var(--muted-foreground)]">
-        Personal photo gallery and journal backed by Azure Functions. Browse
-        filtered images or open the notebook — more polish later.
-      </p>
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Link
-          href="/images"
-          className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          Open Images
-        </Link>
-        <Link
-          href="/journal"
-          className="rounded-md border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--muted)]"
-        >
-          Open Journal
-        </Link>
+    <div className="relative flex h-full items-center justify-center overflow-y-auto px-4 py-16">
+      {/* Subtle atmosphere — slate/blue wash matching existing tokens */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 landing-bg"
+      />
+
+      <div className="relative mx-auto flex w-full max-w-lg flex-col items-center text-center">
+        <div className="flex items-center gap-3 text-[var(--secondary)] dark:text-[var(--primary)]">
+          <Cloud className="h-10 w-10 shrink-0 sm:h-12 sm:w-12" aria-hidden />
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+            image Repo
+          </h1>
+        </div>
+
+        <p className="mt-4 max-w-md text-base text-[var(--muted-foreground)] sm:text-lg">
+          Personal photo gallery and journal. Sign in with your Microsoft
+          account to continue.
+        </p>
+
+        <div className="mt-10">
+          <SignInButton />
+        </div>
       </div>
     </div>
   );
