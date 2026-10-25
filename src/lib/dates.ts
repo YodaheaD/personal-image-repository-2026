@@ -46,3 +46,29 @@ export function formatEpochMs(value: number | string | undefined | null): string
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
+
+/**
+ * Gallery lightbox subtitle — en-US like "October 10, 2026 at 2:43 PM".
+ * Returns null when dateTaken is missing/unparseable.
+ */
+export function formatDateTakenLong(
+  value: number | string | undefined | null,
+): string | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(n)) return null;
+  const d = new Date(n);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const datePart = d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timePart = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${datePart} at ${timePart}`;
+}

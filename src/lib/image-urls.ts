@@ -119,8 +119,8 @@ export function displayUrlOf(
 }
 
 /**
- * Basename for ensureThumbnails — prefer slim `blobName`, else path of
- * compressed/thumbnail URL, else name / RowKey normalized to `.webp`.
+ * Webp basename for labels / download filenames — prefer slim `blobName`,
+ * else path of compressed/thumbnail URL, else name / RowKey normalized to `.webp`.
  */
 export function blobBasenameOf(img: ImageRecord): string | null {
   const slim = typeof img.blobName === "string" ? img.blobName.trim() : "";
@@ -163,4 +163,15 @@ export function displayImageLabel(img: ImageRecord): string {
   const fromBlob = blobBasenameOf(img);
   if (fromBlob) return fromBlob;
   return "Image";
+}
+
+/**
+ * Lightbox title: always `{city} - {state} - {country}` with dash separators
+ * even when a field is empty (e.g. `Paris -  - France`).
+ */
+export function formatLocationTitle(img: ImageRecord): string {
+  const city = String(img.city ?? "").trim();
+  const state = String(img.state ?? "").trim();
+  const country = String(img.country ?? "").trim();
+  return `${city} - ${state} - ${country}`;
 }

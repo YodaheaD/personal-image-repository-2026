@@ -2,13 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { GalleryLightbox } from "@/components/images/gallery-lightbox";
 import type { ImageRecord } from "@/lib/api/types";
-import { formatEpochMs } from "@/lib/dates";
 import {
   displayImageLabel,
   resolveDetailImageUrl,
@@ -64,7 +59,7 @@ function BlobImage({
 }
 
 export function ImageGallery({ images, sasToken }: Props) {
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   if (images.length === 0) {
     return (
@@ -75,81 +70,47 @@ export function ImageGallery({ images, sasToken }: Props) {
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6">
-      {images.map((img, index) => {
-        const id = String(img.RowKey ?? img.blobName ?? img.name ?? index);
-        const gridSrc = resolveGridImageUrl(img, sasToken);
-        const detailSrc = resolveDetailImageUrl(img, sasToken);
-        const title = displayImageLabel(img);
-        const open = openId === id;
+    <>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6">
+        {images.map((img, index) => {
+          const id = String(img.RowKey ?? img.blobName ?? img.name ?? index);
+          const gridSrc = resolveGridImageUrl(img, sasToken);
+          const detailSrc = resolveDetailImageUrl(img, sasToken);
+          const title = displayImageLabel(img);
 
-        if (!gridSrc && !detailSrc) return null;
+          if (!gridSrc && !detailSrc) return null;
 
-        const cellSrc = gridSrc ?? detailSrc!;
-        const cellFallback =
-          detailSrc && detailSrc !== cellSrc ? detailSrc : null;
+          const cellSrc = gridSrc ?? detailSrc!;
+          const cellFallback =
+            detailSrc && detailSrc !== cellSrc ? detailSrc : null;
 
-        return (
-          <li key={id} className="min-w-0">
-            <Popover
-              open={open}
-              onOpenChange={(next) => setOpenId(next ? id : null)}
-            >
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="relative aspect-square w-full overflow-hidden rounded-md border border-[var(--border)] bg-[var(--muted)] text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-                  aria-label={`Open metadata for ${title}`}
-                >
-                  <BlobImage
-                    src={cellSrc}
-                    fallbackSrc={cellFallback}
-                    alt={title}
-                    sizes="(max-width:640px) 50vw, (max-width:768px) 33vw, (max-width:1024px) 25vw, (max-width:1280px) 20vw, 16vw"
-                    className="object-cover"
-                  />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="start"
-                className="max-h-[70vh] w-80 overflow-auto sm:w-96"
+          return (
+            <li key={id} className="min-w-0">
+              <button
+                type="button"
+                className="relative aspect-square w-full overflow-hidden rounded-md border border-[var(--border)] bg-[var(--muted)] text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                aria-label={`Open ${title}`}
+                onClick={() => setViewerIndex(index)}
               >
-                <p className="mb-2 text-sm font-semibold">{title}</p>
-                <div className="relative mb-3 h-40 w-full">
-                  <BlobImage
-                    src={detailSrc ?? cellSrc}
-                    alt=""
-                    sizes="320px"
-                    className="rounded object-contain"
-                  />
-                </div>
-                <dl className="space-y-1.5 text-xs">
-                  {Object.entries(img).map(([key, value]) => {
-                    if (key === "_displayUrl" || key === "sasToken") return null;
-                    if (value == null || value === "") return null;
-                    const display =
-                      key === "dateTaken"
-                        ? formatEpochMs(value as number | string)
-                        : typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value);
-                    return (
-                      <div key={key} className="grid grid-cols-[7rem_1fr] gap-2">
-                        <dt className="truncate font-medium text-[var(--muted-foreground)]">
-                          {key}
-                        </dt>
-                        <dd className="break-all text-[var(--foreground)]">
-                          {display}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-              </PopoverContent>
-            </Popover>
-          </li>
-        );
-      })}
-    </ul>
+                <BlobImage
+                  src={cellSrc}
+                  fallbackSrc={cellFallback}
+                  alt={title}
+                  sizes="(max-width:640px) 50vw, (max-width:768px) 33vw, (max-width:1024px) 25vw, (max-width:1280px) 20vw, 16vw"
+                  className="object-cover"
+                />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <GalleryLightbox
+        images={images}
+        sasToken={sasToken}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+      />
+    </>
   );
 }

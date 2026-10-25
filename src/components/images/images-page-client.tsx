@@ -14,7 +14,6 @@ import type { DateRangeResult } from "@/components/images/date-range-search";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { Button } from "@/components/ui/button";
 import {
-  ensureThumbnails,
   fetchCascadeFilters,
   fetchFilters,
   fetchPaginated,
@@ -31,7 +30,7 @@ import {
   type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
-import { blobBasenameOf, filterDisplayableImages } from "@/lib/image-urls";
+import { filterDisplayableImages } from "@/lib/image-urls";
 import { resolvePaginationNav } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
@@ -60,7 +59,6 @@ export function ImagesPageClient() {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [ensuringThumbs, setEnsuringThumbs] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const skipCacheParam = searchParams.get("skipCache");
@@ -230,21 +228,6 @@ export function ImagesPageClient() {
   const hasDateRange =
     dateRange.startDate != null || dateRange.endDate != null;
 
-  async function onEnsureThumbs() {
-    const names = images
-      .map((img) => blobBasenameOf(img))
-      .filter((n): n is string => Boolean(n));
-    if (names.length === 0 || ensuringThumbs) return;
-    setEnsuringThumbs(true);
-    try {
-      await ensureThumbnails(names);
-    } catch (err: unknown) {
-      console.warn("ensureThumbnails failed", err);
-    } finally {
-      setEnsuringThumbs(false);
-    }
-  }
-
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       <div className="flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--background)]">
@@ -303,58 +286,45 @@ export function ImagesPageClient() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1">
+            {hasPreviousPage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                disabled={loading}
+                aria-label="First page"
+                onClick={() => setPage(1)}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="h-9"
-              disabled={loading || ensuringThumbs || images.length === 0}
-              aria-busy={ensuringThumbs}
-              onClick={() => void onEnsureThumbs()}
+              size="icon"
+              className="h-9 w-9"
+              disabled={!hasPreviousPage || loading}
+              aria-label="Previous page"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
-              {ensuringThumbs ? "Ensuring…" : "Ensure thumbs"}
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-1">
-              {hasPreviousPage && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9"
-                  disabled={loading}
-                  aria-label="First page"
-                  onClick={() => setPage(1)}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={!hasPreviousPage || loading}
-                aria-label="Previous page"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="min-w-[4rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
-                Page {page}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={!hasNextPage || loading}
-                aria-label="Next page"
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <span className="min-w-[4rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
+              Page {page}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              disabled={!hasNextPage || loading}
+              aria-label="Next page"
+              onClick={() => setPage((p) => p + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
