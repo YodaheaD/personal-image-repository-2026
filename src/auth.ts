@@ -19,7 +19,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   secret: process.env.AUTH_SECRET,
-  // App Service sits behind a reverse proxy; required for correct callback URLs.
+  // Behind Azure App Service reverse proxy: trust X-Forwarded-* when present.
+  // Still set AUTH_URL to the public https://<app>.azurewebsites.net host —
+  // without it Auth.js can build redirect_uri from the container hostname
+  // (AADSTS50011). AUTH_URL is read automatically from the environment.
   trustHost: true,
   pages: {
     signIn: "/",
