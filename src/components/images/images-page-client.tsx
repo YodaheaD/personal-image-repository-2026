@@ -14,6 +14,7 @@ import type { DateRangeResult } from "@/components/images/date-range-search";
 import { ImageGallery } from "@/components/images/image-gallery";
 import { Button } from "@/components/ui/button";
 import {
+  ensureThumbnails,
   fetchCascadeFilters,
   fetchFilters,
   fetchPaginated,
@@ -30,7 +31,7 @@ import {
   type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
-import { filterDisplayableImages } from "@/lib/image-urls";
+import { blobBasenameOf, filterDisplayableImages } from "@/lib/image-urls";
 import { resolvePaginationNav } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
@@ -167,6 +168,12 @@ export function ImagesPageClient() {
       });
       setHasNextPage(nav.hasNextPage);
       setHasPreviousPage(nav.hasPreviousPage);
+
+      // Lazy-ensure thumbnailimages for this page; do not block rendering.
+      const names = displayable
+        .map((img) => blobBasenameOf(img))
+        .filter((n): n is string => Boolean(n));
+      void ensureThumbnails(names);
     } catch (err: unknown) {
       setImages([]);
       setHiddenCount(0);
@@ -320,7 +327,7 @@ export function ImagesPageClient() {
           <p className="mb-2 shrink-0 text-xs text-[var(--muted-foreground)]">
             Hid {hiddenCount} item
             {hiddenCount === 1 ? "" : "s"} with HEIC/original-only URLs (gallery
-            uses compressedimages only).
+            uses thumbnailimages / compressedimages only).
           </p>
         )}
 

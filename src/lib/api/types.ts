@@ -66,9 +66,9 @@ export interface ImageRecord {
   PartitionKey?: string;
   RowKey?: string;
   name?: string;
-  /** Prefer for gallery — compressedimages `.webp` (same as compressedUrl). */
+  /** Grid cell — thumbnailimages `<same>.webp` + SAS when private. */
   thumbnailUrl?: string;
-  /** Prefer for gallery — compressedimages `.webp`. */
+  /** Lightbox / fallback — compressedimages `<same>.webp` + SAS when private. */
   compressedUrl?: string;
   /** Remapped server-side to compressed; UI should not prefer these. */
   blobUrl?: string;

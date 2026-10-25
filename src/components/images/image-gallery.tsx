@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/popover";
 import type { ImageRecord } from "@/lib/api/types";
 import { formatEpochMs } from "@/lib/dates";
-import { displayImageLabel, displayUrlOf } from "@/lib/image-urls";
+import {
+  displayImageLabel,
+  resolveDetailImageUrl,
+  resolveGridImageUrl,
+} from "@/lib/image-urls";
 
 interface Props {
   images: ImageRecord[];
@@ -18,27 +22,41 @@ interface Props {
 /**
  * Azure blob URLs are loaded with unoptimized next/image so the App Service
  * never proxies them through /_next/image (409 when the optimizer cannot
- * anonymously fetch private compressedimages blobs).
+ * anonymously fetch private compressedimages / thumbnailimages blobs).
  */
 function BlobImage({
   src,
+  fallbackSrc,
   alt,
   className,
   sizes,
 }: {
   src: string;
+  /** On 404/403 (missing thumb), swap to this URL once. */
+  fallbackSrc?: string | null;
   alt: string;
   className?: string;
   sizes?: string;
 }) {
+  const [current, setCurrent] = useState(src);
+
+  useEffect(() => {
+    setCurrent(src);
+  }, [src]);
+
   return (
     <Image
-      src={src}
+      src={current}
       alt={alt}
       fill
       sizes={sizes}
       unoptimized
       className={className}
+      onError={() => {
+        if (fallbackSrc && current !== fallbackSrc) {
+          setCurrent(fallbackSrc);
+        }
+      }}
     />
   );
 }
@@ -58,11 +76,16 @@ export function ImageGallery({ images }: Props) {
     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6">
       {images.map((img, index) => {
         const id = String(img.RowKey ?? img.name ?? index);
-        const src = displayUrlOf(img);
+        const gridSrc = resolveGridImageUrl(img);
+        const detailSrc = resolveDetailImageUrl(img);
         const title = displayImageLabel(img);
         const open = openId === id;
 
-        if (!src) return null;
+        if (!gridSrc && !detailSrc) return null;
+
+        const cellSrc = gridSrc ?? detailSrc!;
+        const cellFallback =
+          detailSrc && detailSrc !== cellSrc ? detailSrc : null;
 
         return (
           <li key={id} className="min-w-0">
@@ -77,7 +100,8 @@ export function ImageGallery({ images }: Props) {
                   aria-label={`Open metadata for ${title}`}
                 >
                   <BlobImage
-                    src={src}
+                    src={cellSrc}
+                    fallbackSrc={cellFallback}
                     alt={title}
                     sizes="(max-width:640px) 50vw, (max-width:768px) 33vw, (max-width:1024px) 25vw, (max-width:1280px) 20vw, 16vw"
                     className="object-cover"
@@ -91,7 +115,7 @@ export function ImageGallery({ images }: Props) {
                 <p className="mb-2 text-sm font-semibold">{title}</p>
                 <div className="relative mb-3 h-40 w-full">
                   <BlobImage
-                    src={src}
+                    src={detailSrc ?? cellSrc}
                     alt=""
                     sizes="320px"
                     className="rounded object-contain"
