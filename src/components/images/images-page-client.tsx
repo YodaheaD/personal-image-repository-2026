@@ -55,12 +55,21 @@ export function ImagesPageClient() {
   }>({});
   const [page, setPage] = useState(1);
   const [images, setImages] = useState<ImageRecord[]>([]);
+  const [sasToken, setSasToken] = useState<string | null>(null);
   const [hiddenCount, setHiddenCount] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ensuringThumbs, setEnsuringThumbs] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const skipCacheParam = searchParams.get("skipCache");
+  const skipCache =
+    skipCacheParam === "1" ||
+    skipCacheParam?.toLowerCase() === "true" ||
+    skipCacheParam === "yes"
+      ? true
+      : undefined;
 
   useEffect(() => {
     setSearchQuery(searchParams.get("searchQuery") ?? "");
@@ -137,6 +146,7 @@ export function ImagesPageClient() {
       page,
       limit: PAGE_LIMIT,
       searchQuery: searchQuery || undefined,
+      skipCache,
       ...(useLocation
         ? {
             country: selected.country,
@@ -158,8 +168,15 @@ export function ImagesPageClient() {
     try {
       const res = await fetchPaginated(params);
       const raw = imagesFromPaginated(res);
-      const { displayable, hiddenHeicOrMissing } =
-        filterDisplayableImages(raw);
+      const pageSas =
+        typeof res.sasToken === "string" && res.sasToken.trim()
+          ? res.sasToken.trim()
+          : null;
+      const { displayable, hiddenHeicOrMissing } = filterDisplayableImages(
+        raw,
+        pageSas,
+      );
+      setSasToken(pageSas);
       setImages(displayable);
       setHiddenCount(hiddenHeicOrMissing);
       const nav = resolvePaginationNav(res as Record<string, unknown>, {
@@ -171,6 +188,7 @@ export function ImagesPageClient() {
       setHasPreviousPage(nav.hasPreviousPage);
     } catch (err: unknown) {
       setImages([]);
+      setSasToken(null);
       setHiddenCount(0);
       setHasNextPage(false);
       setHasPreviousPage(false);
@@ -178,7 +196,7 @@ export function ImagesPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [page, selected, searchQuery, dateRange]);
+  }, [page, selected, searchQuery, dateRange, skipCache]);
 
   useEffect(() => {
     void loadImages();
@@ -358,7 +376,7 @@ export function ImagesPageClient() {
           {loading ? (
             <p className="text-sm text-[var(--muted-foreground)]">Loading…</p>
           ) : (
-            <ImageGallery images={images} />
+            <ImageGallery images={images} sasToken={sasToken} />
           )}
         </div>
       </section>

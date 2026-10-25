@@ -66,9 +66,14 @@ export interface ImageRecord {
   PartitionKey?: string;
   RowKey?: string;
   name?: string;
-  /** Grid cell — thumbnailimages `<same>.webp` + SAS when private. */
+  /**
+   * Slim paginated API: webp basename in compressedimages / thumbnailimages.
+   * Full URLs are built client-side with response `sasToken` + Blob_Container_locations.
+   */
+  blobName?: string;
+  /** @deprecated Prefer blobName + response sasToken. */
   thumbnailUrl?: string;
-  /** Lightbox / fallback — compressedimages `<same>.webp` + SAS when private. */
+  /** @deprecated Prefer blobName + response sasToken. */
   compressedUrl?: string;
   /** Remapped server-side to compressed; UI should not prefer these. */
   blobUrl?: string;
@@ -104,12 +109,19 @@ export interface PaginatedParams {
   startDate?: number;
   /** Inclusive upper bound on dateTaken — epoch ms UTC */
   endDate?: number;
+  /** Debug: bypass Functions page cache (`skipCache=1` / `true`). */
+  skipCache?: boolean | string | number;
 }
 
 export interface PaginatedResponse {
   data?: ImageRecord[];
   images?: ImageRecord[];
   items?: ImageRecord[];
+  /**
+   * Shared SAS for this page — attach to hardcoded container URLs + item blobName.
+   * Not stored in Functions cache payloads.
+   */
+  sasToken?: string;
   page?: number;
   limit?: number;
   /** May be omitted under early-stop pagination. */

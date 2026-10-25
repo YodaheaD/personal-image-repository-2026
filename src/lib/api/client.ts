@@ -41,6 +41,16 @@ export function buildPaginatedSearchParams(
   if (params.searchQuery) qs.set("searchQuery", params.searchQuery);
   if (params.startDate != null) qs.set("startDate", String(params.startDate));
   if (params.endDate != null) qs.set("endDate", String(params.endDate));
+  // Debug passthrough for Functions page cache (skipCache=1 / true).
+  if (params.skipCache != null && params.skipCache !== false && params.skipCache !== "") {
+    const v = params.skipCache;
+    qs.set(
+      "skipCache",
+      v === true || v === 1 || v === "1" || String(v).toLowerCase() === "true"
+        ? "1"
+        : String(v),
+    );
+  }
 
   for (const key of LOCATION_KEYS) {
     const raw = params[key];

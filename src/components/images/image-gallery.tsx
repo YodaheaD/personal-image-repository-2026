@@ -17,6 +17,8 @@ import {
 
 interface Props {
   images: ImageRecord[];
+  /** Shared SAS from paginated response — builds thumb/compressed URLs. */
+  sasToken?: string | null;
 }
 
 /**
@@ -61,7 +63,7 @@ function BlobImage({
   );
 }
 
-export function ImageGallery({ images }: Props) {
+export function ImageGallery({ images, sasToken }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   if (images.length === 0) {
@@ -75,9 +77,9 @@ export function ImageGallery({ images }: Props) {
   return (
     <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6">
       {images.map((img, index) => {
-        const id = String(img.RowKey ?? img.name ?? index);
-        const gridSrc = resolveGridImageUrl(img);
-        const detailSrc = resolveDetailImageUrl(img);
+        const id = String(img.RowKey ?? img.blobName ?? img.name ?? index);
+        const gridSrc = resolveGridImageUrl(img, sasToken);
+        const detailSrc = resolveDetailImageUrl(img, sasToken);
         const title = displayImageLabel(img);
         const open = openId === id;
 
@@ -123,7 +125,7 @@ export function ImageGallery({ images }: Props) {
                 </div>
                 <dl className="space-y-1.5 text-xs">
                   {Object.entries(img).map(([key, value]) => {
-                    if (key === "_displayUrl") return null;
+                    if (key === "_displayUrl" || key === "sasToken") return null;
                     if (value == null || value === "") return null;
                     const display =
                       key === "dateTaken"
