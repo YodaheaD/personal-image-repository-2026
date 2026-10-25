@@ -35,7 +35,8 @@ async function proxy(req: NextRequest, pathParts: string[]) {
   const key = functionsKey();
   const path = pathParts.join("/");
   const url = new URL(`${base}/${path}`);
-  // Preserve repeated keys (multi-select location filters).
+  // Preserve repeated keys (multi-select location filters) and debug
+  // flags such as skipCache for Functions page-cache bypass.
   for (const [keyName, value] of req.nextUrl.searchParams.entries()) {
     url.searchParams.append(keyName, value);
   }

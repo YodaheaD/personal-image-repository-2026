@@ -1,8 +1,10 @@
 import type { ImageRecord } from "@/lib/api/types";
+import {
+  buildCompressedUrl,
+  buildThumbnailUrl,
+} from "@/lib/Blob_Container_locations";
 
 const HEIC_RE = /\.heic(?:\?|#|$)/i;
-const COMPRESSED_CONTAINER = "compressedimages";
-const THUMBNAIL_CONTAINER = "thumbnailimages";
 
 function isHeicUrl(url: string): boolean {
   return HEIC_RE.test(url);
@@ -15,8 +17,8 @@ function isHeicUrl(url: string): boolean {
 function isUsablePreviewUrl(raw: string): boolean {
   if (!raw.trim() || isHeicUrl(raw)) return false;
   if (
-    raw.includes(`/${COMPRESSED_CONTAINER}/`) ||
-    raw.includes(`/${THUMBNAIL_CONTAINER}/`)
+    raw.includes("/compressedimages/") ||
+    raw.includes("/thumbnailimages/")
   ) {
     return true;
   }
@@ -35,16 +37,41 @@ function firstUsable(
   return null;
 }
 
-/** Small grid cell — prefer `thumbnailUrl` (thumbnailimages), else compressed. */
-export function resolveGridImageUrl(img: ImageRecord): string | null {
+/** Prefer slim `blobName`; normalize legacy name/RowKey to `.webp`. */
+export function blobNameOf(img: ImageRecord): string | null {
+  const slim = typeof img.blobName === "string" ? img.blobName.trim() : "";
+  if (slim && !HEIC_RE.test(slim)) return slim;
+  if (slim) return slim.replace(/\.heic$/i, ".webp");
+  return blobBasenameOf(img);
+}
+
+/**
+ * Small grid cell — prefer thumbnailimages from blobName + sasToken,
+ * else legacy thumbnailUrl / compressedUrl.
+ */
+export function resolveGridImageUrl(
+  img: ImageRecord,
+  sasToken?: string | null,
+): string | null {
+  const name = blobNameOf(img);
+  if (name && sasToken) {
+    return buildThumbnailUrl(name, sasToken);
+  }
   return firstUsable(img.thumbnailUrl, img.compressedUrl);
 }
 
 /**
- * Lightbox / popover detail — prefer fuller-quality `compressedUrl`.
- * Falls back to thumbnail only if compressed is missing.
+ * Lightbox / popover detail — compressedimages from blobName + sasToken,
+ * else legacy compressedUrl / thumbnailUrl.
  */
-export function resolveDetailImageUrl(img: ImageRecord): string | null {
+export function resolveDetailImageUrl(
+  img: ImageRecord,
+  sasToken?: string | null,
+): string | null {
+  const name = blobNameOf(img);
+  if (name && sasToken) {
+    return buildCompressedUrl(name, sasToken);
+  }
   return firstUsable(img.compressedUrl, img.thumbnailUrl);
 }
 
@@ -52,19 +79,27 @@ export function resolveDetailImageUrl(img: ImageRecord): string | null {
  * @deprecated Prefer resolveGridImageUrl / resolveDetailImageUrl.
  * Kept for callers that need any usable preview (thumb then compressed).
  */
-export function resolveCompressedImageUrl(img: ImageRecord): string | null {
-  return resolveGridImageUrl(img);
+export function resolveCompressedImageUrl(
+  img: ImageRecord,
+  sasToken?: string | null,
+): string | null {
+  return resolveGridImageUrl(img, sasToken);
 }
 
 /** Drop records with no usable thumb/compressed preview (never show HEIC). */
-export function filterDisplayableImages(images: ImageRecord[]): {
+export function filterDisplayableImages(
+  images: ImageRecord[],
+  sasToken?: string | null,
+): {
   displayable: ImageRecord[];
   hiddenHeicOrMissing: number;
 } {
   const displayable: ImageRecord[] = [];
   let hiddenHeicOrMissing = 0;
   for (const img of images) {
-    const url = resolveGridImageUrl(img) ?? resolveDetailImageUrl(img);
+    const url =
+      resolveGridImageUrl(img, sasToken) ??
+      resolveDetailImageUrl(img, sasToken);
     if (!url) {
       hiddenHeicOrMissing += 1;
       continue;
@@ -74,17 +109,27 @@ export function filterDisplayableImages(images: ImageRecord[]): {
   return { displayable, hiddenHeicOrMissing };
 }
 
-export function displayUrlOf(img: ImageRecord): string | undefined {
+export function displayUrlOf(
+  img: ImageRecord,
+  sasToken?: string | null,
+): string | undefined {
   const tagged = img._displayUrl;
   if (typeof tagged === "string" && tagged.length > 0) return tagged;
-  return resolveGridImageUrl(img) ?? undefined;
+  return resolveGridImageUrl(img, sasToken) ?? undefined;
 }
 
 /**
- * Basename for ensureThumbnails — prefer path of compressed/thumbnail URL,
- * else name / RowKey normalized to `.webp`.
+ * Basename for ensureThumbnails — prefer slim `blobName`, else path of
+ * compressed/thumbnail URL, else name / RowKey normalized to `.webp`.
  */
 export function blobBasenameOf(img: ImageRecord): string | null {
+  const slim = typeof img.blobName === "string" ? img.blobName.trim() : "";
+  if (slim) {
+    const base = slim.split("/").pop() || slim;
+    if (HEIC_RE.test(base)) return base.replace(/\.heic$/i, ".webp");
+    return base;
+  }
+
   for (const raw of [img.compressedUrl, img.thumbnailUrl, img._displayUrl]) {
     if (typeof raw !== "string" || !raw.trim()) continue;
     try {
@@ -112,7 +157,7 @@ export function blobBasenameOf(img: ImageRecord): string | null {
 
 /**
  * Human label for gallery/alt — never surface `.heic` filenames.
- * Prefer basename of the compressed/thumbnail display URL (.webp).
+ * Prefer blobName / basename of the display URL (.webp).
  */
 export function displayImageLabel(img: ImageRecord): string {
   const fromBlob = blobBasenameOf(img);
