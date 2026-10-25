@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { auth } from "@/auth";
+import { SessionProvider } from "@/components/auth/session-provider";
 import { Navbar } from "@/components/layout/navbar";
 import "./globals.css";
 
@@ -18,18 +20,22 @@ export const metadata: Metadata = {
   description: "Personal image repository UI",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html lang="en" className="h-svh overflow-hidden">
       <body
         className={`${geistSans.variable} ${geistMono.variable} flex h-svh flex-col overflow-hidden antialiased`}
       >
-        <Navbar />
-        <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        <SessionProvider session={session}>
+          <Navbar signedIn={!!session} />
+          <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        </SessionProvider>
       </body>
     </html>
   );
