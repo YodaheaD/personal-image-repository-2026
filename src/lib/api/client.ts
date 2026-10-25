@@ -28,9 +28,9 @@ const LOCATION_KEYS = [
 ] as const;
 
 /**
- * Serialize paginated params for Functions PR #4:
+ * Serialize paginated params for Functions `/main/paginated`:
  * location multi-select as repeated keys (also accepts comma-separated server-side).
- * OR within level, AND across levels.
+ * OR within level, AND across levels. No `sortOrder` (RowKey / oldest-first).
  */
 export function buildPaginatedSearchParams(
   params: PaginatedParams,
@@ -38,7 +38,6 @@ export function buildPaginatedSearchParams(
   const qs = new URLSearchParams();
   qs.set("page", String(params.page ?? 1));
   qs.set("limit", String(params.limit ?? 50));
-  if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
   if (params.searchQuery) qs.set("searchQuery", params.searchQuery);
   if (params.startDate != null) qs.set("startDate", String(params.startDate));
   if (params.endDate != null) qs.set("endDate", String(params.endDate));
