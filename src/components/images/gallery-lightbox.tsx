@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
+  ChevronRight,
   Expand,
   Minus,
   MoreHorizontal,
@@ -103,6 +104,37 @@ async function downloadImage(url: string, filename: string) {
   }
 }
 
+/**
+ * Open compressed image for inline viewing in a new tab.
+ * Prefer a same-origin blob: URL typed as image/webp so Azure
+ * Content-Disposition: attachment does not force a download.
+ * Falls back to window.open(url) if fetch/CORS fails.
+ */
+async function openCompressedForViewing(url: string) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const raw = await res.blob();
+    const typed =
+      raw.type && raw.type.startsWith("image/")
+        ? raw
+        : new Blob([raw], { type: "image/webp" });
+    const objectUrl = URL.createObjectURL(typed);
+    // Open without noopener so we can clear opener; noopener makes open()
+    // return null and would falsely look like a blocked popup.
+    const win = window.open(objectUrl, "_blank");
+    if (win) {
+      win.opener = null;
+    }
+    // Revoke after the new tab has had time to load the blob.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch {
+    // Best-effort if fetch/CORS fails — Storage may still force download
+    // via Content-Disposition: attachment.
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 export function GalleryLightbox({
   images,
   sasToken,
@@ -113,6 +145,9 @@ export function GalleryLightbox({
   const active = open && index != null ? images[index] : null;
   const [zoom, setZoom] = useState(ZOOM_MIN);
   const activeThumbRef = useRef<HTMLButtonElement | null>(null);
+
+  const canGoPrev = open && index != null && index > 0;
+  const canGoNext = open && index != null && index < images.length - 1;
 
   useEffect(() => {
     setZoom(ZOOM_MIN);
@@ -131,6 +166,23 @@ export function GalleryLightbox({
     });
   }, [open, index]);
 
+  useEffect(() => {
+    if (!open || index == null) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (index! > 0) onIndexChange(index! - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (index! < images.length - 1) onIndexChange(index! + 1);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, index, images.length, onIndexChange]);
+
   const compressedUrl = active
     ? resolveDetailImageUrl(active, sasToken)
     : null;
@@ -145,7 +197,17 @@ export function GalleryLightbox({
 
   function openInNewTab() {
     if (!compressedUrl) return;
-    window.open(compressedUrl, "_blank", "noopener,noreferrer");
+    void openCompressedForViewing(compressedUrl);
+  }
+
+  function goPrev() {
+    if (index == null || index <= 0) return;
+    onIndexChange(index - 1);
+  }
+
+  function goNext() {
+    if (index == null || index >= images.length - 1) return;
+    onIndexChange(index + 1);
   }
 
   return (
@@ -259,10 +321,10 @@ export function GalleryLightbox({
           </div>
         </div>
 
-        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-2 pb-28 pt-16 sm:px-4">
+        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-12 pb-28 pt-16 sm:px-16">
           {compressedUrl ? (
             <div
-              className="relative h-full w-full max-w-5xl transition-transform duration-150 ease-out"
+              className="relative z-0 h-full w-full max-w-5xl transition-transform duration-150 ease-out"
               style={{ transform: `scale(${zoom})` }}
             >
               <Image
@@ -271,7 +333,7 @@ export function GalleryLightbox({
                 fill
                 sizes="100vw"
                 unoptimized
-                className="object-contain"
+                className="pointer-events-none object-contain"
                 priority
               />
             </div>
@@ -279,6 +341,34 @@ export function GalleryLightbox({
             <p className="text-sm text-white/60">Image unavailable</p>
           )}
         </div>
+
+        {/* Side chevrons: letterbox edges of the dialog (above image/overlays). */}
+        {canGoPrev ? (
+          <button
+            type="button"
+            aria-label="Previous image"
+            className="pointer-events-auto absolute left-0 top-1/2 z-30 flex h-24 w-12 -translate-y-1/2 items-center justify-center text-white/45 transition-colors hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:w-14"
+            onClick={goPrev}
+          >
+            <ChevronLeft
+              className="h-10 w-10 sm:h-12 sm:w-12"
+              strokeWidth={1.25}
+            />
+          </button>
+        ) : null}
+        {canGoNext ? (
+          <button
+            type="button"
+            aria-label="Next image"
+            className="pointer-events-auto absolute right-0 top-1/2 z-30 flex h-24 w-12 -translate-y-1/2 items-center justify-center text-white/45 transition-colors hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:w-14"
+            onClick={goNext}
+          >
+            <ChevronRight
+              className="h-10 w-10 sm:h-12 sm:w-12"
+              strokeWidth={1.25}
+            />
+          </button>
+        ) : null}
 
         <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 to-transparent px-2 pb-3 pt-8 sm:px-4">
           <ul
