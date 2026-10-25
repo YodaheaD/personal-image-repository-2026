@@ -115,30 +115,6 @@ export function imagesFromPaginated(res: PaginatedResponse) {
   return res.data ?? res.images ?? res.items ?? [];
 }
 
-/**
- * Ask Functions to materialize missing thumbnailimages blobs for the given
- * webp basenames (manual Ensure thumbs control; not called on page load).
- * POST /main/ensureThumbnails `{ names: string[] }`.
- * Failures are ignored — thumbs may 404 until ensure/backfill catches up.
- */
-export async function ensureThumbnails(names: string[]): Promise<void> {
-  const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  if (unique.length === 0) return;
-  try {
-    await api.post(
-      "/main/ensureThumbnails",
-      { names: unique },
-      {
-        // Don't surface ensure errors to the gallery; 4xx/5xx are fine.
-        validateStatus: () => true,
-        timeout: 30_000,
-      },
-    );
-  } catch {
-    /* ignore network / proxy failures */
-  }
-}
-
 /** Journal paths — Functions PR #5 contract. */
 export async function journalReturnList(): Promise<unknown> {
   const { data } = await api.get<unknown>("/journal/returnList");
