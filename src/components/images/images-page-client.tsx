@@ -59,6 +59,7 @@ export function ImagesPageClient() {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [ensuringThumbs, setEnsuringThumbs] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -168,12 +169,6 @@ export function ImagesPageClient() {
       });
       setHasNextPage(nav.hasNextPage);
       setHasPreviousPage(nav.hasPreviousPage);
-
-      // Lazy-ensure thumbnailimages for this page; do not block rendering.
-      const names = displayable
-        .map((img) => blobBasenameOf(img))
-        .filter((n): n is string => Boolean(n));
-      void ensureThumbnails(names);
     } catch (err: unknown) {
       setImages([]);
       setHiddenCount(0);
@@ -216,6 +211,21 @@ export function ImagesPageClient() {
 
   const hasDateRange =
     dateRange.startDate != null || dateRange.endDate != null;
+
+  async function onEnsureThumbs() {
+    const names = images
+      .map((img) => blobBasenameOf(img))
+      .filter((n): n is string => Boolean(n));
+    if (names.length === 0 || ensuringThumbs) return;
+    setEnsuringThumbs(true);
+    try {
+      await ensureThumbnails(names);
+    } catch (err: unknown) {
+      console.warn("ensureThumbnails failed", err);
+    } finally {
+      setEnsuringThumbs(false);
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
@@ -275,45 +285,58 @@ export function ImagesPageClient() {
             )}
           </div>
 
-          <div className="flex items-center gap-1">
-            {hasPreviousPage && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={loading || ensuringThumbs || images.length === 0}
+              aria-busy={ensuringThumbs}
+              onClick={() => void onEnsureThumbs()}
+            >
+              {ensuringThumbs ? "Ensuring…" : "Ensure thumbs"}
+            </Button>
+            <div className="flex items-center gap-1">
+              {hasPreviousPage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  disabled={loading}
+                  aria-label="First page"
+                  onClick={() => setPage(1)}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 className="h-9 w-9"
-                disabled={loading}
-                aria-label="First page"
-                onClick={() => setPage(1)}
+                disabled={!hasPreviousPage || loading}
+                aria-label="Previous page"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                <ChevronsLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              disabled={!hasPreviousPage || loading}
-              aria-label="Previous page"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="min-w-[4rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
-              Page {page}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              disabled={!hasNextPage || loading}
-              aria-label="Next page"
-              onClick={() => setPage((p) => p + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              <span className="min-w-[4rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
+                Page {page}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                disabled={!hasNextPage || loading}
+                aria-label="Next page"
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 

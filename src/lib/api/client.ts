@@ -106,9 +106,10 @@ export function imagesFromPaginated(res: PaginatedResponse) {
 }
 
 /**
- * Fire-and-forget: ask Functions to materialize missing thumbnailimages blobs.
- * POST /main/ensureThumbnails `{ names: string[] }` (webp basenames).
- * Failures are ignored — thumbs may 404 until ensure catches up.
+ * Ask Functions to materialize missing thumbnailimages blobs for the given
+ * webp basenames (manual Ensure thumbs control; not called on page load).
+ * POST /main/ensureThumbnails `{ names: string[] }`.
+ * Failures are ignored — thumbs may 404 until ensure/backfill catches up.
  */
 export async function ensureThumbnails(names: string[]): Promise<void> {
   const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
