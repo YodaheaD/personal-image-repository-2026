@@ -31,7 +31,7 @@ import {
   type SelectedFilters,
 } from "@/lib/filters";
 import { filterDisplayableImages } from "@/lib/image-urls";
-import { resolveTotalPages } from "@/lib/pagination";
+import { resolvePaginationNav } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 const PAGE_LIMIT = 50;
@@ -52,11 +52,11 @@ export function ImagesPageClient() {
     startDate?: number;
     endDate?: number;
   }>({});
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [hiddenCount, setHiddenCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,7 +134,6 @@ export function ImagesPageClient() {
     const params: PaginatedParams = {
       page,
       limit: PAGE_LIMIT,
-      sortOrder,
       searchQuery: searchQuery || undefined,
       ...(useLocation
         ? {
@@ -161,22 +160,23 @@ export function ImagesPageClient() {
         filterDisplayableImages(raw);
       setImages(displayable);
       setHiddenCount(hiddenHeicOrMissing);
-      setTotalPages(
-        resolveTotalPages(res as Record<string, unknown>, {
-          requestedLimit: PAGE_LIMIT,
-          pageItemCount: raw.length,
-          currentPage: page,
-        }),
-      );
+      const nav = resolvePaginationNav(res as Record<string, unknown>, {
+        requestedLimit: PAGE_LIMIT,
+        pageItemCount: raw.length,
+        currentPage: page,
+      });
+      setHasNextPage(nav.hasNextPage);
+      setHasPreviousPage(nav.hasPreviousPage);
     } catch (err: unknown) {
       setImages([]);
       setHiddenCount(0);
-      setTotalPages(1);
+      setHasNextPage(false);
+      setHasPreviousPage(false);
       setError(err instanceof Error ? err.message : "Failed to load images");
     } finally {
       setLoading(false);
     }
-  }, [page, sortOrder, selected, searchQuery, dateRange]);
+  }, [page, selected, searchQuery, dateRange]);
 
   useEffect(() => {
     void loadImages();
@@ -268,62 +268,45 @@ export function ImagesPageClient() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              Sort
-              <select
-                className="h-9 rounded-md border border-[var(--border)] bg-[var(--background)] px-2 text-sm"
-                value={sortOrder}
-                onChange={(e) => {
-                  setSortOrder(e.target.value as "asc" | "desc");
-                  setPage(1);
-                }}
-              >
-                <option value="desc">Newest first</option>
-                <option value="asc">Oldest first</option>
-              </select>
-            </label>
-
-            <div className="flex items-center gap-1">
-              {page > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9"
-                  disabled={loading}
-                  aria-label="First page"
-                  onClick={() => setPage(1)}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-              )}
+          <div className="flex items-center gap-1">
+            {hasPreviousPage && (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 className="h-9 w-9"
-                disabled={page <= 1 || loading}
-                aria-label="Previous page"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={loading}
+                aria-label="First page"
+                onClick={() => setPage(1)}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronsLeft className="h-4 w-4" />
               </Button>
-              <span className="min-w-[5.5rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
-                Page {page} / {totalPages}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                disabled={page >= totalPages || loading}
-                aria-label="Next page"
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              disabled={!hasPreviousPage || loading}
+              aria-label="Previous page"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="min-w-[4rem] px-1 text-center text-sm tabular-nums text-[var(--muted-foreground)]">
+              Page {page}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              disabled={!hasNextPage || loading}
+              aria-label="Next page"
+              onClick={() => setPage((p) => p + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 

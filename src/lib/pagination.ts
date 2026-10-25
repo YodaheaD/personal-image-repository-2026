@@ -1,9 +1,36 @@
 /**
- * Resolve total page count from a paginated API payload.
+ * Resolve prev/next from a paginated API payload.
  *
- * Common bug: response includes `total` but omits `limit` / `totalPages`,
- * so `total && limit ? ceil(total/limit) : 1` always became 1.
+ * Early-stop `/main/paginated` may omit exact `total` / `totalPages` / `sortOrder`.
+ * Prefer `hasNextPage` / `hasPreviousPage`; fall back to page fullness and current page.
  */
+
+function asBool(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const s = value.trim().toLowerCase();
+    if (s === "true" || s === "1") return true;
+    if (s === "false" || s === "0") return false;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return undefined;
+}
+
+function pickBool(
+  obj: Record<string, unknown>,
+  keys: string[],
+): boolean | undefined {
+  for (const key of keys) {
+    if (key in obj) {
+      const b = asBool(obj[key]);
+      if (b !== undefined) return b;
+    }
+  }
+  return undefined;
+}
 
 function asPositiveInt(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
@@ -16,7 +43,7 @@ function asPositiveInt(value: unknown): number | undefined {
   return undefined;
 }
 
-function pick(
+function pickInt(
   obj: Record<string, unknown>,
   keys: string[],
 ): number | undefined {
@@ -29,7 +56,7 @@ function pick(
   return undefined;
 }
 
-export function resolveTotalPages(
+export function resolvePaginationNav(
   res: Record<string, unknown>,
   opts: {
     requestedLimit: number;
@@ -37,55 +64,46 @@ export function resolveTotalPages(
     pageItemCount: number;
     currentPage: number;
   },
-): number {
+): { hasPreviousPage: boolean; hasNextPage: boolean } {
   const { requestedLimit, pageItemCount, currentPage } = opts;
+
+  const explicitPrev = pickBool(res, [
+    "hasPreviousPage",
+    "HasPreviousPage",
+    "hasPrevPage",
+    "HasPrevPage",
+    "hasPrevious",
+    "HasPrevious",
+  ]);
+  const explicitNext = pickBool(res, [
+    "hasNextPage",
+    "HasNextPage",
+    "hasNext",
+    "HasNext",
+    "hasMore",
+    "HasMore",
+  ]);
+
   const pageSize =
-    pick(res, ["limit", "Limit", "pageSize", "PageSize", "page_size"]) ??
+    pickInt(res, ["limit", "Limit", "pageSize", "PageSize", "page_size"]) ??
     requestedLimit;
 
-  const explicitPages = pick(res, [
-    "totalPages",
-    "TotalPages",
-    "pageCount",
-    "PageCount",
-    "pages",
-    "Pages",
-  ]);
-  if (explicitPages !== undefined && explicitPages >= 1) {
-    return Math.max(1, explicitPages);
+  let hasNextPage = explicitNext;
+  if (hasNextPage === undefined) {
+    if (
+      typeof res.continuationToken === "string" &&
+      res.continuationToken.length > 0
+    ) {
+      hasNextPage = true;
+    } else if (pageSize > 0 && pageItemCount >= pageSize) {
+      hasNextPage = true;
+    } else {
+      hasNextPage = false;
+    }
   }
 
-  const total = pick(res, [
-    "total",
-    "Total",
-    "totalCount",
-    "TotalCount",
-    "totalItems",
-    "TotalItems",
-    "count",
-    "Count",
-    "itemCount",
-    "ItemCount",
-  ]);
-  if (total !== undefined && pageSize > 0) {
-    return Math.max(1, Math.ceil(total / pageSize));
-  }
+  const hasPreviousPage =
+    currentPage > 1 && (explicitPrev ?? true);
 
-  // hasMore / continuation without totals
-  if (res.hasMore === true || res.HasMore === true) {
-    return Math.max(currentPage + 1, 2);
-  }
-  if (
-    typeof res.continuationToken === "string" &&
-    res.continuationToken.length > 0
-  ) {
-    return Math.max(currentPage + 1, 2);
-  }
-
-  // Full page of results ⇒ at least one more page may exist
-  if (pageSize > 0 && pageItemCount >= pageSize) {
-    return Math.max(currentPage + 1, 2);
-  }
-
-  return Math.max(1, currentPage);
+  return { hasPreviousPage, hasNextPage };
 }

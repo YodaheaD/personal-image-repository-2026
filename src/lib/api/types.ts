@@ -93,7 +93,6 @@ export interface ImageRecord {
 export interface PaginatedParams {
   page?: number;
   limit?: number;
-  sortOrder?: "asc" | "desc";
   country?: string | string[];
   state?: string | string[];
   city?: string | string[];
@@ -113,8 +112,12 @@ export interface PaginatedResponse {
   items?: ImageRecord[];
   page?: number;
   limit?: number;
+  /** May be omitted under early-stop pagination. */
   total?: number;
+  /** May be omitted under early-stop pagination. */
   totalPages?: number;
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
   returnedFilters?: FilterRow[];
   [key: string]: unknown;
 }
