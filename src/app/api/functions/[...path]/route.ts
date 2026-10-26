@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios, { AxiosError, Method } from "axios";
+import { parseJsonLenient } from "@/lib/safe-json";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,26 @@ async function proxy(req: NextRequest, pathParts: string[]) {
       timeout: 60_000,
     });
 
-    return NextResponse.json(response.data, { status: response.status });
+    // Axios leaves a string when upstream JSON is invalid (e.g. Python NaN).
+    // Re-parse leniently so the browser never receives a raw string body.
+    let data = response.data as unknown;
+    if (typeof data === "string") {
+      try {
+        data = parseJsonLenient(data);
+      } catch (parseErr) {
+        return NextResponse.json(
+          {
+            error:
+              parseErr instanceof Error
+                ? parseErr.message
+                : "Invalid JSON from Functions",
+          },
+          { status: 502 },
+        );
+      }
+    }
+
+    return NextResponse.json(data, { status: response.status });
   } catch (err) {
     const ax = err as AxiosError;
     return NextResponse.json(

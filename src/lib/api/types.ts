@@ -79,12 +79,14 @@ export interface ImageRecord {
   blobUrl?: string;
   url?: string;
   dateTaken?: number | string;
-  country?: string;
-  state?: string;
-  city?: string;
-  area?: string;
-  neighborhood?: string;
-  country2?: string;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  /** May be null after Functions NaN → null serialization. */
+  area?: string | null;
+  /** May be null after Functions NaN → null serialization. */
+  neighborhood?: string | null;
+  country2?: string | null;
   /** Client-only resolved display URL (never HEIC). */
   _displayUrl?: string;
   [key: string]: unknown;
@@ -113,6 +115,17 @@ export interface PaginatedParams {
   skipCache?: boolean | string | number;
 }
 
+/** Nested nav envelope used by some Functions paginated responses. */
+export interface PaginationMeta {
+  page?: number;
+  limit?: number;
+  total?: number;
+  totalPages?: number;
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
+  [key: string]: unknown;
+}
+
 export interface PaginatedResponse {
   data?: ImageRecord[];
   images?: ImageRecord[];
@@ -130,6 +143,8 @@ export interface PaginatedResponse {
   totalPages?: number;
   hasNextPage?: boolean;
   hasPreviousPage?: boolean;
+  /** Prefer reading nav from here when present; UI also flattens to top-level. */
+  pagination?: PaginationMeta;
   returnedFilters?: FilterRow[];
   [key: string]: unknown;
 }
