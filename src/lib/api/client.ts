@@ -10,6 +10,7 @@ import {
   type SelectedFilters,
 } from "@/lib/filters";
 import { parseReturnTextBody } from "@/lib/journal-hierarchy";
+import { normalizePaginatedResponse } from "@/lib/pagination";
 
 /** Browser Axios client → Next.js BFF proxy (injects function key server-side). */
 export const api: AxiosInstance = axios.create({
@@ -105,10 +106,10 @@ export async function fetchPaginated(
   params: PaginatedParams,
 ): Promise<PaginatedResponse> {
   const qs = buildPaginatedSearchParams(params);
-  const { data } = await api.get<PaginatedResponse>(
-    `/main/paginated?${qs.toString()}`,
-  );
-  return data;
+  const { data } = await api.get<unknown>(`/main/paginated?${qs.toString()}`);
+  // Axios leaves a string when Functions returns invalid JSON (e.g. NaN).
+  // Normalize once: lenient parse, nested `pagination` → top-level nav fields.
+  return normalizePaginatedResponse(data);
 }
 
 export function imagesFromPaginated(res: PaginatedResponse) {

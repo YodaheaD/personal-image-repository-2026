@@ -177,7 +177,7 @@ export function ImagesPageClient() {
       setSasToken(pageSas);
       setImages(displayable);
       setHiddenCount(hiddenHeicOrMissing);
-      const nav = resolvePaginationNav(res as Record<string, unknown>, {
+      const nav = resolvePaginationNav(res, {
         requestedLimit: PAGE_LIMIT,
         pageItemCount: raw.length,
         currentPage: page,
