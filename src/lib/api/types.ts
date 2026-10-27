@@ -107,6 +107,11 @@ export interface PaginatedParams {
   country2?: string | string[];
   neighborhood?: string | string[];
   searchQuery?: string;
+  /**
+   * Visual tags from imageTags (OR within selection).
+   * Repeated `tag=` query params; combines with location or date via API AND.
+   */
+  tag?: string | string[];
   /** Inclusive lower bound on dateTaken — epoch ms UTC */
   startDate?: number;
   /** Inclusive upper bound on dateTaken — epoch ms UTC */
