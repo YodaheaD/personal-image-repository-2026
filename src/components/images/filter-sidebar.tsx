@@ -17,6 +17,9 @@ import {
   type FilterCatalog,
   type SelectedFilters,
 } from "@/lib/filters";
+import keywords from "@/lib/keywords.json";
+
+const TAG_OPTIONS: readonly string[] = keywords;
 
 interface Props {
   catalog: FilterCatalog;
@@ -24,10 +27,18 @@ interface Props {
   cascadeAllowed?: FilterCatalog;
   selected: SelectedFilters;
   onSelectedChange: (next: SelectedFilters) => void;
+  selectedTags: string[];
+  onTagsChange: (next: string[]) => void;
   onDateSearch: (range: DateRangeResult) => void;
   onReset: () => void;
   disabled?: boolean;
   hasDateRange: boolean;
+}
+
+function toggleTag(selected: string[], value: string): string[] {
+  return selected.includes(value)
+    ? selected.filter((t) => t !== value)
+    : [...selected, value];
 }
 
 export function FilterSidebar({
@@ -36,6 +47,8 @@ export function FilterSidebar({
   cascadeAllowed,
   selected,
   onSelectedChange,
+  selectedTags,
+  onTagsChange,
   onDateSearch,
   onReset,
   disabled,
@@ -62,7 +75,8 @@ export function FilterSidebar({
       {(hasLocationSelection(selected) || hasDateRange) && (
         <p className="shrink-0 border-b border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
           Location and dateTaken are mutually exclusive — applying one clears
-          the other. Lower filter levels follow selected parents.
+          the other. Tags combine with either. Lower filter levels follow
+          selected parents.
         </p>
       )}
 
@@ -122,6 +136,47 @@ export function FilterSidebar({
               </AccordionItem>
             );
           })}
+
+          <AccordionItem
+            id="tags"
+            title="Tags"
+            badge={selectedTags.length}
+            open={isOpen("tags")}
+            onToggle={() => toggle("tags")}
+          >
+            {TAG_OPTIONS.length === 0 ? (
+              <p className="text-xs text-[var(--muted-foreground)]">
+                No options
+              </p>
+            ) : (
+              <ul className="max-h-48 space-y-1 overflow-y-auto">
+                {TAG_OPTIONS.map((opt) => {
+                  const id = `tag-${opt}`;
+                  const isChecked = selectedTags.includes(opt);
+                  return (
+                    <li key={opt}>
+                      <label
+                        htmlFor={id}
+                        className="flex cursor-pointer items-start gap-2 text-sm"
+                      >
+                        <input
+                          id={id}
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                          checked={isChecked}
+                          disabled={disabled}
+                          onChange={() =>
+                            onTagsChange(toggleTag(selectedTags, opt))
+                          }
+                        />
+                        <span className="break-words leading-snug">{opt}</span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </AccordionItem>
 
           <AccordionItem
             id="dateTaken"

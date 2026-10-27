@@ -45,6 +45,7 @@ export function ImagesPageClient() {
   const [bundles, setBundles] = useState<FilterBundles>({});
   const [cascadeAllowed, setCascadeAllowed] = useState<FilterCatalog>({});
   const [selected, setSelected] = useState<SelectedFilters>({});
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState(
     () => searchParams.get("searchQuery") ?? "",
   );
@@ -145,6 +146,7 @@ export function ImagesPageClient() {
       limit: PAGE_LIMIT,
       searchQuery: searchQuery || undefined,
       skipCache,
+      ...(selectedTags.length > 0 ? { tag: selectedTags } : {}),
       ...(useLocation
         ? {
             country: selected.country,
@@ -194,7 +196,7 @@ export function ImagesPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [page, selected, searchQuery, dateRange, skipCache]);
+  }, [page, selected, selectedTags, searchQuery, dateRange, skipCache]);
 
   useEffect(() => {
     void loadImages();
@@ -205,6 +207,11 @@ export function ImagesPageClient() {
     if (hasLocationSelection(next)) {
       setDateRange({});
     }
+    setPage(1);
+  }
+
+  function onTagsChange(next: string[]) {
+    setSelectedTags(next);
     setPage(1);
   }
 
@@ -219,6 +226,7 @@ export function ImagesPageClient() {
 
   function resetAll() {
     setSelected({});
+    setSelectedTags([]);
     setSearchQuery("");
     setDateRange({});
     setPage(1);
@@ -262,6 +270,8 @@ export function ImagesPageClient() {
             cascadeAllowed={cascadeAllowed}
             selected={selected}
             onSelectedChange={onLocationChange}
+            selectedTags={selectedTags}
+            onTagsChange={onTagsChange}
             onDateSearch={onDateSearch}
             onReset={resetAll}
             disabled={loading}

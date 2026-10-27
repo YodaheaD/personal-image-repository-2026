@@ -64,6 +64,17 @@ export function buildPaginatedSearchParams(
           .filter(Boolean);
     for (const v of values) qs.append(key, v);
   }
+
+  // Tags: always append when selected (alongside location XOR date).
+  if (params.tag != null && params.tag !== "") {
+    const tags = Array.isArray(params.tag)
+      ? params.tag
+      : String(params.tag)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+    for (const t of tags) qs.append("tag", t);
+  }
   return qs;
 }
 
